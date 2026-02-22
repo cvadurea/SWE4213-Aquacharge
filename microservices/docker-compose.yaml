@@ -1,0 +1,164 @@
+services:
+  gateway:
+    build: ./gateway
+    ports:
+      - "3000:3000"
+    depends_on:
+      - analytics-service
+      - auth-service
+      - booking-service
+      - fleet-service
+      - notification-service
+      - port-service
+      - user-service
+    networks:
+      - app-network
+
+  analytics-service:
+    build: ./analytics-dashboard-service
+    ports:
+      - "3001:3001"
+    environment:
+      DB_HOST: analytics-db
+      DB_PORT: 5432
+      DB_NAME: analyticsdb
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+    #   interval: 10s
+    #   timeout: 5s
+    #   retries: 5
+    # depends_on:
+    #   - analytics-db
+    networks:
+      - app-network
+
+  auth-service:
+    build: ./auth-service
+    ports:
+      - "3002:3002"
+    environment:
+      DB_HOST: auth-db
+      DB_PORT: 5432
+      DB_NAME: authdb
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+    #   interval: 10s
+    #   timeout: 5s
+    #   retries: 5
+    # depends_on:
+    #   - analytics-db
+    networks:
+      - app-network
+
+  booking-service:
+    build: ./booking-service
+    ports:
+      - "3003:3003"
+    environment:
+      DB_HOST: booking-db
+      DB_PORT: 5432
+      DB_NAME: bookingdb
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+    #   interval: 10s
+    #   timeout: 5s
+    #   retries: 5
+    # depends_on:
+    #   - analytics-db
+    networks:
+      - app-network
+
+  fleet-service:
+    build: ./fleet-mgmt-service
+    ports:
+      - "3004:3004"
+    environment:
+      DB_HOST: fleet-db
+      DB_PORT: 5432
+      DB_NAME: fleetdb
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+    #   interval: 10s
+    #   timeout: 5s
+    #   retries: 5
+    # depends_on:
+    #   - analytics-db
+    networks:
+      - app-network
+
+  notification-service:
+    build: ./notification-service
+    ports:
+      - "3005:3005"
+    environment:
+      DB_HOST: notification-db
+      DB_PORT: 5432
+      DB_NAME: notificationdb
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+    #   interval: 10s
+    #   timeout: 5s
+    #   retries: 5
+    # depends_on:
+    #   - analytics-db
+    networks:
+      - app-network
+
+  port-service:
+    build: ./port-mgmt-service
+    ports:
+      - "3006:3006"
+    environment:
+      DB_HOST: port-db
+      DB_PORT: 5432
+      DB_NAME: portdb
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+    #   interval: 10s
+    #   timeout: 5s
+    #   retries: 5
+    # depends_on:
+    #   - analytics-db
+    networks:
+      - app-network
+
+  user-service:
+    build: ./user-mgmt-service
+    ports:
+      - "3007:3007"
+    environment:
+      DB_HOST: user-db
+      DB_PORT: 5432
+      DB_NAME: userdb
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+    #   interval: 10s
+    #   timeout: 5s
+    #   retries: 5
+    # depends_on:
+    #   - analytics-db
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+# volumes:
+#   user-data:
+#   product-data:
+#   order-data:

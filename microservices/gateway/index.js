@@ -18,6 +18,7 @@ const authenticate = (req, res, next) => {
   next();
 };
 
+
 app.use('/api/analytics', authenticate, createProxyMiddleware({
   target: 'http://user-service:3001',
   changeOrigin: true,

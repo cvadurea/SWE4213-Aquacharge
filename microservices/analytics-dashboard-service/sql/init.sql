@@ -1,0 +1,8 @@
+-- CREATE TABLE IF NOT EXISTS orders (
+--     id SERIAL PRIMARY KEY,
+--     user_id INTEGER NOT NULL,
+--     product_id INTEGER NOT NULL,
+--     quantity INTEGER NOT NULL DEFAULT 1,
+--     total_price DECIMAL(10, 2) NOT NULL,
+--     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+-- );

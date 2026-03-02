@@ -1,0 +1,40 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Port {
+  id               String    @id @default(uuid())
+  port_name        String
+  address          String
+  active_chargers  Int       @default(0)
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+  
+  // Relations
+  chargers         Charger[]
+}
+
+model Charger {
+  id               Int       @id @default(autoincrement())
+  associated_port_id String
+  charger_type     String    // "DC_FAST", "AC_STANDARD", "V2G"
+  is_available     Boolean   @default(true)
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+  
+  // Relations
+  port             Port      @relation(fields: [associated_port_id], references: [id])
+  bookings         Booking[]
+}

@@ -39,8 +39,11 @@ services:
     ports:
       - "3002:3002"
     environment:
-      DATABASE_URL: "postgresql://postgres:postgres@user-db:5432/userdb?schema=public"
-      JWT_SECRET: "your-secret-key-change-in-production"
+      DB_HOST: user-db
+      DB_PORT: 5432
+      DB_NAME: userdb
+      DB_USER: postgres
+      DB_PASSWORD: postgres
     depends_on:
       - user-db
     networks:
@@ -56,9 +59,8 @@ services:
       DB_NAME: bookingdb
       DB_USER: postgres
       DB_PASSWORD: postgres
-      DATABASE_URL: "postgresql://postgres:postgres@booking-db:5432/bookingdb?schema=public"
-    depends_on:
-      - booking-db
+    # depends_on:
+    #   - booking-db
     networks:
       - app-network
 
@@ -72,9 +74,8 @@ services:
       DB_NAME: fleetdb
       DB_USER: postgres
       DB_PASSWORD: postgres
-      DATABASE_URL: "postgresql://postgres:postgres@fleet-db:5432/fleetdb?schema=public"
-    depends_on:
-      - fleet-db
+    # depends_on:
+    #   - fleet-db
     networks:
       - app-network
 
@@ -108,9 +109,8 @@ services:
       DB_NAME: portdb
       DB_USER: postgres
       DB_PASSWORD: postgres
-      DATABASE_URL: "postgresql://postgres:postgres@port-db:5432/portdb?schema=public"
-    depends_on:
-      - port-db
+    # depends_on:
+    #   - port-db
     networks:
       - app-network
 
@@ -124,25 +124,10 @@ services:
       DB_NAME: userdb
       DB_USER: postgres
       DB_PASSWORD: postgres
-      DATABASE_URL: "postgresql://postgres:postgres@user-db:5432/userdb?schema=public"
     depends_on:
       - user-db
     networks:
       - app-network
-
-  # Database Services
-  booking-db:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: bookingdb
-    volumes:
-      - booking-data:/var/lib/postgresql/data
-    networks:
-      - app-network
-    ports:
-      - "5433:5432"
 
   user-db:
     image: postgres:15-alpine
@@ -154,34 +139,6 @@ services:
       - user-data:/var/lib/postgresql/data
     networks:
       - app-network
-    ports:
-      - "5434:5432"
-
-  port-db:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: portdb
-    volumes:
-      - port-data:/var/lib/postgresql/data
-    networks:
-      - app-network
-    ports:
-      - "5435:5432"
-
-  fleet-db:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: fleetdb
-    volumes:
-      - fleet-data:/var/lib/postgresql/data
-    networks:
-      - app-network
-    ports:
-      - "5436:5432"
 
 networks:
   app-network:

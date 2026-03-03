@@ -39,6 +39,10 @@ export default function SidebarVO() {
           <ListItem key={text} disablePadding>
             <ListItemButton
               sx={text === 'Logout' ? { color: 'error.main' } : {}}
+              onClick={text === 'Logout' ? () => {
+                localStorage.removeItem('user');
+                window.location.href = '/login';
+              } : undefined}
             >
               <ListItemText
                 primary={text}

@@ -14,6 +14,10 @@ const drawerWidth = 250;
 
 export default function SidebarVO({ onNavigate, onLogout }) {
   const handleNavigation = (text) => {
+    if (text === 'Dashboards' && onNavigate) {
+      onNavigate('dashboard');
+    }
+
     if (text === 'My Vessels' && onNavigate) {
       onNavigate('my-vessels');
     }

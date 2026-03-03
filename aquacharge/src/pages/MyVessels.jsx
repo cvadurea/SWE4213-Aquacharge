@@ -12,7 +12,7 @@ const initialFormState = {
     is_primary: false,
 };
 
-const MyVessels = ({ onNavigate }) => {
+const MyVessels = ({ onNavigate, onLogout }) => {
     const [vessels, setVessels] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState(initialFormState);
@@ -165,7 +165,7 @@ const MyVessels = ({ onNavigate }) => {
 
     return (
         <div className="min-h-screen bg-slate-950 text-white flex">
-      <SidebarVO onNavigate={onNavigate} />
+      <SidebarVO onNavigate={onNavigate} onLogout={onLogout} />
 
       <main className="flex-1 p-6">
         <div className="max-w-7xl mx-auto">

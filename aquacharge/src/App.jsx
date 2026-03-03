@@ -60,7 +60,7 @@ function App() {
               currentPage === 'dashboard' ? (
                 <DashboardVO onLogout={onLogout} onNavigate={handleNavigate} />
               ) : (
-                <MyVessels onNavigate={handleNavigate} />
+                <MyVessels onNavigate={handleNavigate} onLogout={onLogout} />
               )
             ) : (
               <DashboardPO onLogout={onLogout} />

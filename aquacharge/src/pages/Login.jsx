@@ -10,6 +10,11 @@ const Login = ({ onLogin, onSignUpClick }) => {
         e.preventDefault();
         setError('');
 
+        if (!email || !password) {
+            setError('Please enter both email and password.');
+            return;
+        }
+
         try{
             const response = await fetch('http://localhost:3002/login', {
                 method: 'POST',
@@ -21,13 +26,20 @@ const Login = ({ onLogin, onSignUpClick }) => {
                     password: password
                 }),
             });
-            const data = await response.json();
+            const contentType = response.headers.get('content-type') || '';
+            const data = contentType.includes('application/json')
+                ? await response.json()
+                : { message: 'Unexpected response from server' };
 
             if (response.ok) {
                 localStorage.setItem('token', data.token);
                 onLogin(data.user);
             } else {
-                setError(data.message || 'Login failed');
+                if (response.status === 401) {
+                    setError('Invalid email or password.');
+                } else {
+                    setError(data.message || 'Login failed');
+                }
             }
         } 
         catch (err) {
@@ -40,6 +52,7 @@ const Login = ({ onLogin, onSignUpClick }) => {
         <form onSubmit = {submitLogin}>
             <input type="text" placeholder="Email" className="mb-2 p-2 border border-gray-300 rounded w-full" value={email} onChange={(e) => setEmail(e.target.value)} />
             <input type="password" placeholder="Password" className="mb-4 p-2 border border-gray-300 rounded w-full" value={password} onChange={(e) => setPassword(e.target.value)} />
+            {error && <p className="mb-4 text-red-500">{error}</p>}
             <button type="submit" className="w-full px-4 py-2 bg-green-500 text-white rounded">
                 Login
             </button>

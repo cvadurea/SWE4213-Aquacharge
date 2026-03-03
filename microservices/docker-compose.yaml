@@ -78,8 +78,8 @@ services:
       DB_USER: postgres
       DB_PASSWORD: postgres
       JWT_SECRET: "bwf8734tir87y2o83dyro94jo192o9sy1j8734ytrjm192y9efh879s1y379"
-    # depends_on:
-    #   - fleet-db
+    depends_on:
+      - fleet-db
     networks:
       - app-network
 
@@ -113,8 +113,9 @@ services:
       DB_NAME: portdb
       DB_USER: postgres
       DB_PASSWORD: postgres
-    # depends_on:
-    #   - port-db
+    depends_on:
+      - port-db
+      - charger-db
     networks:
       - app-network
 
@@ -154,6 +155,28 @@ services:
       - fleet-data:/var/lib/postgresql/data
     networks:
       - app-network
+    
+  port-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: portdb
+    volumes:
+      - port-data:/var/lib/postgresql/data
+    networks:
+      - app-network
+  
+  charger-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: chargerdb
+    volumes:
+      - charger-data:/var/lib/postgresql/data
+    networks:
+      - app-network
 
 networks:
   app-network:
@@ -164,3 +187,4 @@ volumes:
   user-data:
   port-data:
   fleet-data:
+  charger-data:

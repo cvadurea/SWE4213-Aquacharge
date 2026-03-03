@@ -12,7 +12,13 @@ import MailIcon from '@mui/icons-material/Mail';
 
 const drawerWidth = 250;
 
-export default function SidebarVO() {
+export default function SidebarVO({ onNavigate, onLogout }) {
+  const handleNavigation = (text) => {
+    if (text === 'My Vessels' && onNavigate) {
+      onNavigate('my-vessels');
+    }
+  };
+
   const list = (
     <Box
       sx={{ 
@@ -26,7 +32,7 @@ export default function SidebarVO() {
       <List>
         {['Dashboards', 'Find Chargers', 'My Bookings', 'My Vessels'].map((text, index) => (
           <ListItem key={text} disablePadding>
-            <ListItemButton>
+            <ListItemButton onClick={() => handleNavigation(text)}>
               <ListItemText primary={text} />
             </ListItemButton>
           </ListItem>
@@ -40,8 +46,9 @@ export default function SidebarVO() {
             <ListItemButton
               sx={text === 'Logout' ? { color: 'error.main' } : {}}
               onClick={text === 'Logout' ? () => {
-                localStorage.removeItem('user');
-                window.location.href = '/login';
+                if (onLogout) {
+                  onLogout();
+                }
               } : undefined}
             >
               <ListItemText

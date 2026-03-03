@@ -66,7 +66,9 @@ services:
       - app-network
 
   fleet-service:
-    build: ./fleet-mgmt-service
+    build:
+      context: .
+      dockerfile: fleet-mgmt-service/Dockerfile
     ports:
       - "3004:3004"
     environment:
@@ -75,6 +77,7 @@ services:
       DB_NAME: fleetdb
       DB_USER: postgres
       DB_PASSWORD: postgres
+      JWT_SECRET: "bwf8734tir87y2o83dyro94jo192o9sy1j8734ytrjm192y9efh879s1y379"
     # depends_on:
     #   - fleet-db
     networks:
@@ -138,6 +141,17 @@ services:
       POSTGRES_DB: userdb
     volumes:
       - user-data:/var/lib/postgresql/data
+    networks:
+      - app-network
+  
+  fleet-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: fleetdb
+    volumes:
+      - fleet-data:/var/lib/postgresql/data
     networks:
       - app-network
 

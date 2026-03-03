@@ -1,9 +1,21 @@
 const express = require('express');
 const { Pool } = require('pg');
-const auth = require('../middleware/auth');
+const auth = require('./middleware/auth.js');
 
 const app = express();
 app.use(express.json());
+
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', process.env.CORS_ORIGIN || 'http://localhost:5173');
+    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(204);
+    }
+
+    next();
+});
 
 const PORT = 3004;
 
@@ -20,7 +32,7 @@ const initDB = async () => {
         await pool.query(`
             CREATE TABLE IF NOT EXISTS vessels (
                 id SERIAL PRIMARY KEY,
-                owner_id VARCHAR(255) UNIQUE NOT NULL,
+                owner_id VARCHAR(255) NOT NULL,
                 vessel_name VARCHAR(255) NOT NULL,
                 vessel_model VARCHAR(255) NOT NULL,
                 registration_number VARCHAR(255) NOT NULL,
@@ -28,6 +40,7 @@ const initDB = async () => {
                 is_primary BOOLEAN NOT NULL DEFAULT FALSE
             );
         `);
+        console.log('Vessels table initialized');
     } catch (error) {
         console.error('Error initializing database:', error);
     }
@@ -119,8 +132,8 @@ app.delete('/vessels/:id', auth.auth, async (req, res) => {
     }
 });
 
-initDB().then(() => {
-  waitForDB().then(() => {
+waitForDB().then(() => {
+  initDB().then(() => {
     app.listen(PORT, () => {
         console.log(`Fleet Management Service running on port ${PORT}`);
     });

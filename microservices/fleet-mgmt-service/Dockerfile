@@ -4,11 +4,12 @@ RUN apk add --no-cache curl
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY fleet-mgmt-service/package*.json ./
 
 RUN npm install
 
-COPY . .
+COPY fleet-mgmt-service/ ./
+COPY middleware/ ./middleware/
 
 EXPOSE 3004
 

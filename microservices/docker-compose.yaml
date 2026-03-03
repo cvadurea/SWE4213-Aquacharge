@@ -44,6 +44,7 @@ services:
       DB_NAME: userdb
       DB_USER: postgres
       DB_PASSWORD: postgres
+      JWT_SECRET: "bwf8734tir87y2o83dyro94jo192o9sy1j8734ytrjm192y9efh879s1y379"
     depends_on:
       - user-db
     networks:

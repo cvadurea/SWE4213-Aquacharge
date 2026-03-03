@@ -1,12 +1,20 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { Pool } = require('pg');
 
 const app = express();
 app.use(express.json());
 
-const prisma = new PrismaClient();
 const PORT = 3002;
+
+const pool = new Pool({
+  host: process.env.DB_HOST || 'user-db',
+  port: parseInt(process.env.DB_PORT || '5432'),
+  database: process.env.DB_NAME || 'userdb',
+  user: process.env.DB_USER || 'postgres',
+  password: process.env.DB_PASSWORD || 'postgres',
+});
 
 app.post('/login', async (req, res) => {
     try {
@@ -16,7 +24,8 @@ app.post('/login', async (req, res) => {
             return res.status(400).json({ message: 'Email and password required' });
         }
 
-        const user = await prisma.user.findUnique({ where: { email } });
+        const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        const user = result.rows[0];
         if (!user) {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
@@ -51,24 +60,25 @@ app.post('/register', async (req, res) => {
         return res.status(400).json({ message: 'All fields are required' });
     }
     try {
-        const existingUser = await prisma.user.findUnique({ where: { email } });
-        if (existingUser) {
+        const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        if (existingUser.rows.length > 0) {
             return res.status(400).json({ message: 'Email already in use' });
         }
         if (password.length < 6 || !password.match(/[A-Z]/) || !password.match(/[a-z]/) || !password.match(/[0-9]/)) {
             return res.status(400).json({ message: 'Password must be at least 6 characters and include uppercase, lowercase, and a number' });
         }
         const password_hash = await bcrypt.hash(password, 10);
-        const user = await prisma.user.create({
-            data: {
-                email,  
-                password_hash,
-                type,
-                first_name,
-                last_name,
-            },
+        const user = await pool.query(`
+            INSERT INTO users (email, password_hash, type, first_name, last_name)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING id, email, first_name, last_name, type
+        `, [email, password_hash, first_name, last_name, type]);
+        const token = jwt.sign({ userId: user.rows[0].id, email: user.rows[0].email }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        res.status(201).json({ 
+            message: 'User registered successfully', 
+            user: user.rows[0], 
+            token,
         });
-        res.status(201).json({ message: 'User registered successfully', user: { id: user.id, email: user.email, type: user.type } });
     } catch (error) {
         console.error('Registration error:', error);
         res.status(500).json({ message: 'Server error' });

@@ -57,6 +57,31 @@ app.get('/users', async (req, res) => {
     }   
 });
 
+app.get('/users/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error fetching user:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/health', async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    return res.status(200).json({ status: 'ok' });
+  } catch (err) {
+    console.error('Health check failed (DB):', err);
+    return res.status(500).json({ status: 'error', error: 'database_unreachable' });
+  }
+});
+
 waitForDB().then(() => {
   initDB().then(() => {
     app.listen(PORT, () => {

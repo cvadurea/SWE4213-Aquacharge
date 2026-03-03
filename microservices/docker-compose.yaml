@@ -104,13 +104,16 @@ services:
       - app-network
 
   port-service:
-    build: ./port-mgmt-service
+    build:
+      context: .
+      dockerfile: port-mgmt-service/Dockerfile
     ports:
       - "3006:3006"
     environment:
       DB_HOST: port-db
       DB_PORT: 5432
       DB_NAME: portdb
+      JWT_SECRET: "bwf8734tir87y2o83dyro94jo192o9sy1j8734ytrjm192y9efh879s1y379"
       DB_USER: postgres
       DB_PASSWORD: postgres
     depends_on:

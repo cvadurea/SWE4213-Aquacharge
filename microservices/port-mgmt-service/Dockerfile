@@ -4,11 +4,12 @@ RUN apk add --no-cache curl
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY port-mgmt-service/package*.json ./
 
 RUN npm install
 
-COPY . .
+COPY port-mgmt-service/ ./
+COPY middleware/ ./middleware/
 
 EXPOSE 3006
 

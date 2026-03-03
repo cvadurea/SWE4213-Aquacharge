@@ -5,6 +5,7 @@ import  Signup  from './pages/Signup'
 import DashboardVO from './pages/DashboardVO'
 import DashboardPO from './pages/DashboardPO'
 import MyVessels from './pages/MyVessels'
+import MyPort from './pages/MyPort'
 
 function App() {
   const [isLogin, setIsLogin] = useState(true);
@@ -63,7 +64,11 @@ function App() {
                 <MyVessels onNavigate={handleNavigate} onLogout={onLogout} />
               )
             ) : (
-              <DashboardPO onLogout={onLogout} />
+              currentPage === 'dashboard' ? (
+                <DashboardPO onLogout={onLogout} onNavigate={handleNavigate} />
+              ) : (
+                <MyPort onNavigate={handleNavigate} onLogout={onLogout} />
+              )
             )
           ) : (
             isLogin ? (

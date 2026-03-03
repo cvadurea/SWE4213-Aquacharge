@@ -21,11 +21,11 @@ const Signup = ({ onBackToLogin }) => {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
+                    email: email,
+                    type: type,
                     first_name: firstName,
                     last_name: lastName,
-                    email: email,
                     password: password,
-                    type: type
                 }),
             });
 

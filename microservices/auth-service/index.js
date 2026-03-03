@@ -84,7 +84,7 @@ app.post('/register', async (req, res) => {
             INSERT INTO users (email, password_hash, type, first_name, last_name)
             VALUES ($1, $2, $3, $4, $5)
             RETURNING id, email, first_name, last_name, type
-        `, [email, password_hash, first_name, last_name, type]);
+        `, [email, password_hash, type, first_name, last_name]);
         const token = jwt.sign({ userId: user.rows[0].id, email: user.rows[0].email }, process.env.JWT_SECRET, { expiresIn: '1h' });
         res.status(201).json({ 
             message: 'User registered successfully', 

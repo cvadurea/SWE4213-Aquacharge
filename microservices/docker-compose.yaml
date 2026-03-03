@@ -39,18 +39,10 @@ services:
     ports:
       - "3002:3002"
     environment:
-      DB_HOST: auth-db
-      DB_PORT: 5432
-      DB_NAME: authdb
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
-    #   interval: 10s
-    #   timeout: 5s
-    #   retries: 5
-    # depends_on:
-    #   - analytics-db
+      DATABASE_URL: "postgresql://postgres:postgres@user-db:5432/userdb?schema=public"
+      JWT_SECRET: "your-secret-key-change-in-production"
+    depends_on:
+      - user-db
     networks:
       - app-network
 

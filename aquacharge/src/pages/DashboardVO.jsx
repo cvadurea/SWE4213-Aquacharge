@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import SidebarVO from '../components/SidebarVO';
 
-const DashboardVO = ({ onLogout }) => {
+const DashboardVO = ({ onLogout, onNavigate }) => {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
@@ -16,8 +16,8 @@ const DashboardVO = ({ onLogout }) => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white p-6">
-      <SidebarVO />
+    <div className="min-h-screen bg-slate-950 text-white flex">
+      <SidebarVO onNavigate={onNavigate} onLogout={onLogout} />
       <main className="flex-1 p-6"></main>
       <div className="max-w-7xl mx-auto">
         {/* Header */}

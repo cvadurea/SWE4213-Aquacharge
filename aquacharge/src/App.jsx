@@ -4,11 +4,13 @@ import  Login  from './pages/Login'
 import  Signup  from './pages/Signup'
 import DashboardVO from './pages/DashboardVO'
 import DashboardPO from './pages/DashboardPO'
+import MyVessels from './pages/MyVessels'
 
 function App() {
   const [isLogin, setIsLogin] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('token'));
   const [userType, setUserType] = useState(null);
+  const [currentPage, setCurrentPage] = useState('dashboard');
 
   useEffect(() => {
     const user = localStorage.getItem('user');
@@ -42,7 +44,12 @@ function App() {
     setIsLoggedIn(false);
     setUserType(null);
     setIsLogin(true);
+    setCurrentPage('dashboard');
   }
+
+  const handleNavigate = (page) => {
+    setCurrentPage(page);
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-950">
@@ -50,7 +57,11 @@ function App() {
         <div>
           {isLoggedIn && userType ? (
             userType === 'vessel_owner' ? (
-              <DashboardVO onLogout={onLogout} />
+              currentPage === 'dashboard' ? (
+                <DashboardVO onLogout={onLogout} onNavigate={handleNavigate} />
+              ) : (
+                <MyVessels onNavigate={handleNavigate} />
+              )
             ) : (
               <DashboardPO onLogout={onLogout} />
             )

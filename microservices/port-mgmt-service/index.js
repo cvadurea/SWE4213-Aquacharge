@@ -1,7 +1,23 @@
 const express = require('express');
 const { Pool } = require('pg');
+const auth = require('./middleware/auth.js');
 
 const app = express();
+
+// CORS middleware
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    
+    next();
+});
+
 app.use(express.json());
 
 const PORT = 3006;
@@ -112,7 +128,7 @@ app.post('/ports', async (req, res) => {
     }
 });
 
-app.get('/ports/:id/chargers', async (req, res) => {
+app.get('/ports/:id/chargers', auth.auth, async (req, res) => {
     const { id } = req.params;
     try {
         const result = await poolCharger.query('SELECT * FROM chargers WHERE port_id = $1', [id]);
@@ -124,7 +140,7 @@ app.get('/ports/:id/chargers', async (req, res) => {
     }   
 });
 
-app.post('/ports/:id/chargers', async (req, res) => {
+app.post('/ports/:id/chargers', auth.auth, async (req, res) => {
     const { id } = req.params;
     const { type, is_available } = req.body;  
     try {

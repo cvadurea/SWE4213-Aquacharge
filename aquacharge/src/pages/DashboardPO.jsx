@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import SidebarPO from '../components/SidebarPO';
 
-const DashboardPO = ({ onLogout }) => {
+const DashboardPO = ({ onLogout, onNavigate }) => {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
@@ -17,7 +17,7 @@ const DashboardPO = ({ onLogout }) => {
 
   return (
     <div className="min-h-screen bg-slate-950 text-white flex">
-      <SidebarPO />
+      <SidebarPO onNavigate={onNavigate} onLogout={onLogout} />
       <main className="flex-1 p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}

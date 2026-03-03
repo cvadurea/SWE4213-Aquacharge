@@ -37,15 +37,21 @@ export default function SidebarPO() {
       <List>
         {['Profile', 'Logout'].map((text, index) => (
           <ListItem key={text} disablePadding>
-            <ListItemButton>
-              <ListItemIcon>
-                {index % 2 === 0 ? <InboxIcon /> : <MailIcon />}
-              </ListItemIcon>
-              <ListItemText primary={text} />
+            <ListItemButton
+              sx={text === 'Logout' ? { color: 'error.main' } : {}}
+              onClick={text === 'Logout' ? () => {
+                localStorage.removeItem('user');
+                window.location.href = '/login';
+              } : undefined}
+            >
+              <ListItemText
+                primary={text}
+                slotProps={{ primary: { sx: text === 'Logout' ? { color: 'error.main' } : {} } }}
+              />
             </ListItemButton>
           </ListItem>
         ))}
-      </List>
+      </List>s
     </Box>
   );
 

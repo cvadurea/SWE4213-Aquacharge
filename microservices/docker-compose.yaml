@@ -118,7 +118,7 @@ services:
       DB_PASSWORD: postgres
     depends_on:
       - port-db
-      - charger-db
+      - user-db
     networks:
       - app-network
 
@@ -167,6 +167,8 @@ services:
       POSTGRES_DB: portdb
     volumes:
       - port-data:/var/lib/postgresql/data
+    depends_on:
+      - user-db      
     networks:
       - app-network
   
@@ -178,6 +180,8 @@ services:
       POSTGRES_DB: chargerdb
     volumes:
       - charger-data:/var/lib/postgresql/data
+    depends_on:
+      - port-db
     networks:
       - app-network
 

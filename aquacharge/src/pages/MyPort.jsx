@@ -11,6 +11,9 @@ const initialFormState = {
 
 const MyPort = ({ onNavigate, onLogout }) => {
     const [chargers, setChargers] = useState([]);
+    const [portInfo, setPortInfo] = useState(null);
+    const [isPortInfoLoading, setIsPortInfoLoading] = useState(true);
+    const [portInfoError, setPortInfoError] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState(initialFormState);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -81,8 +84,69 @@ const MyPort = ({ onNavigate, onLogout }) => {
         }
     };
 
+    const getPortInfo = async () => {
+        const user = getStoredUser();
+
+        if (!user?.id) {
+            setPortInfoError('Unable to load linked port information.');
+            setIsPortInfoLoading(false);
+            return;
+        }
+
+        try {
+            setPortInfoError('');
+            setIsPortInfoLoading(true);
+
+            const directResponse = await fetch(`${PORT_API_BASE}/ports/${encodeURIComponent(user.id)}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            const directData = await parseResponseBody(directResponse);
+
+            if (directResponse.ok) {
+                setPortInfo(directData);
+                return;
+            }
+
+            if (directResponse.status === 404 && user.email) {
+                const listResponse = await fetch(`${PORT_API_BASE}/ports`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+
+                const listData = await parseResponseBody(listResponse);
+
+                if (listResponse.ok && Array.isArray(listData)) {
+                    const linkedPort = listData.find((port) => port.owner_email === user.email);
+                    if (linkedPort) {
+                        setPortInfo(linkedPort);
+                        return;
+                    }
+                }
+            }
+
+            setPortInfo(null);
+            setPortInfoError(
+                (directData && directData.message) ||
+                    `Could not load port details (HTTP ${directResponse.status}).`
+            );
+        } catch (err) {
+            console.error('Error fetching port information:', err);
+            setPortInfo(null);
+            setPortInfoError('Could not connect to port service for port details.');
+        } finally {
+            setIsPortInfoLoading(false);
+        }
+    };
+
     useEffect(() => {
         getChargers();
+        getPortInfo();
     }, []);
 
     const onInputChange = (event) => {
@@ -167,6 +231,32 @@ const MyPort = ({ onNavigate, onLogout }) => {
                             <h1 className="text-4xl font-bold">My Port</h1>
                             <p className="text-gray-400 mt-2">Manage your charging stations</p>
                         </div>
+
+                        <div className="w-full max-w-sm rounded-lg border border-slate-700 bg-slate-900 p-4 text-sm">
+                            <p className="text-slate-400 mb-2">Port Information</p>
+
+                            {isPortInfoLoading ? (
+                                <p className="text-slate-300">Loading port details...</p>
+                            ) : portInfo ? (
+                                <div className="space-y-1 text-slate-200">
+                                    <p>
+                                        <span className="text-slate-400">Name:</span> {portInfo.port_name}
+                                    </p>
+                                    <p>
+                                        <span className="text-slate-400">Address:</span> {portInfo.address}
+                                    </p>
+                                    <p>
+                                        <span className="text-slate-400">Capacity:</span> {portInfo.capacity}
+                                    </p>
+                                    <p>
+                                        <span className="text-slate-400">Available Points:</span>{' '}
+                                        {portInfo.available_charging_points}
+                                    </p>
+                                </div>
+                            ) : (
+                                <p className="text-amber-300">{portInfoError || 'No linked port found.'}</p>
+                            )}
+                        </div>
                     </div>
 
                     {error && <p className="text-red-400 mb-4">{error}</p>}
@@ -204,11 +294,8 @@ const MyPort = ({ onNavigate, onLogout }) => {
                                     required
                                 >
                                     <option value="">Select Type</option>
-                                    <option value="Type 1">Type 1</option>
-                                    <option value="Type 2">Type 2</option>
-                                    <option value="CCS">CCS</option>
-                                    <option value="CHAdeMO">CHAdeMO</option>
-                                    <option value="Tesla">Tesla</option>
+                                    <option value="regular">Regular</option>
+                                    <option value="bidirectional">Bi-Directional</option>
                                 </select>
                             </div>
 

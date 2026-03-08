@@ -43,12 +43,11 @@ const MyPort = ({ onNavigate, onLogout }) => {
         return { message: text || 'Unexpected response from server' };
     };
 
-    const getChargers = async () => {
-        const user = getStoredUser();
+    const getChargers = async (portId) => {
         const token = localStorage.getItem('token');
 
-        if (!user?.id) {
-            setError('Unable to load user session. Please log in again.');
+        if (!portId) {
+            setError('No linked port found for this account.');
             return;
         }
 
@@ -59,7 +58,7 @@ const MyPort = ({ onNavigate, onLogout }) => {
 
         try {
             setError('');
-            const response = await fetch(`${PORT_API_BASE}/ports/${encodeURIComponent(user.id)}/chargers`, {
+            const response = await fetch(`${PORT_API_BASE}/ports/${encodeURIComponent(portId)}/chargers`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -90,28 +89,13 @@ const MyPort = ({ onNavigate, onLogout }) => {
         if (!user?.id) {
             setPortInfoError('Unable to load linked port information.');
             setIsPortInfoLoading(false);
-            return;
+            return null;
         }
 
         try {
             setPortInfoError('');
             setIsPortInfoLoading(true);
-
-            const directResponse = await fetch(`${PORT_API_BASE}/ports/${encodeURIComponent(user.id)}`, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            });
-
-            const directData = await parseResponseBody(directResponse);
-
-            if (directResponse.ok) {
-                setPortInfo(directData);
-                return;
-            }
-
-            if (directResponse.status === 404 && user.email) {
+            if (user.email) {
                 const listResponse = await fetch(`${PORT_API_BASE}/ports`, {
                     method: 'GET',
                     headers: {
@@ -125,28 +109,48 @@ const MyPort = ({ onNavigate, onLogout }) => {
                     const linkedPort = listData.find((port) => port.owner_email === user.email);
                     if (linkedPort) {
                         setPortInfo(linkedPort);
-                        return;
+                        return linkedPort;
                     }
                 }
             }
 
+            const directResponse = await fetch(`${PORT_API_BASE}/ports/${encodeURIComponent(user.id)}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+            const directData = await parseResponseBody(directResponse);
+
+            if (directResponse.ok) {
+                setPortInfo(directData);
+                return directData;
+            }
+
             setPortInfo(null);
-            setPortInfoError(
-                (directData && directData.message) ||
-                    `Could not load port details (HTTP ${directResponse.status}).`
-            );
+            setPortInfoError((directData && directData.message) || `Could not load port details (HTTP ${directResponse.status}).`);
+            return null;
         } catch (err) {
             console.error('Error fetching port information:', err);
             setPortInfo(null);
             setPortInfoError('Could not connect to port service for port details.');
+            return null;
         } finally {
             setIsPortInfoLoading(false);
         }
     };
 
     useEffect(() => {
-        getChargers();
-        getPortInfo();
+        const loadPageData = async () => {
+            const linkedPort = await getPortInfo();
+            if (linkedPort?.id) {
+                await getChargers(linkedPort.id);
+            } else {
+                setChargers([]);
+            }
+        };
+
+        loadPageData();
     }, []);
 
     const onInputChange = (event) => {
@@ -165,16 +169,21 @@ const MyPort = ({ onNavigate, onLogout }) => {
 
     const createCharger = async (event) => {
         event.preventDefault();
-        const user = getStoredUser();
         const token = localStorage.getItem('token');
+        let targetPortId = portInfo?.id;
 
-        if (!user?.id) {
-            setError('Unable to load user session. Please log in again.');
-            return;
+        if (!targetPortId) {
+            const linkedPort = await getPortInfo();
+            targetPortId = linkedPort?.id;
         }
 
         if (!token) {
             setError('Missing auth token. Please log in again.');
+            return;
+        }
+
+        if (!targetPortId) {
+            setError('No linked port found for this account.');
             return;
         }
 
@@ -187,7 +196,7 @@ const MyPort = ({ onNavigate, onLogout }) => {
         setError('');
 
         try {
-            const response = await fetch(`${PORT_API_BASE}/ports/${encodeURIComponent(user.id)}/chargers`, {
+            const response = await fetch(`${PORT_API_BASE}/ports/${encodeURIComponent(targetPortId)}/chargers`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -210,7 +219,7 @@ const MyPort = ({ onNavigate, onLogout }) => {
                 return;
             }
 
-            await getChargers();
+            await getChargers(targetPortId);
             closeModal();
         } catch (err) {
             console.error('Error creating charger:', err);

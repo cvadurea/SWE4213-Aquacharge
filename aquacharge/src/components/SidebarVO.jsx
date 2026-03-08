@@ -18,6 +18,10 @@ export default function SidebarVO({ onNavigate, onLogout }) {
       onNavigate('dashboard');
     }
 
+    if (text === 'Find Chargers' && onNavigate) {
+      onNavigate('find-chargers');
+    }
+
     if (text === 'My Vessels' && onNavigate) {
       onNavigate('my-vessels');
     }

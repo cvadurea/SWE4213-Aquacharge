@@ -1,5 +1,6 @@
 const express = require('express');
 const { Pool } = require('pg');
+const bcrypt = require('bcrypt');
 
 const app = express();
 app.use(express.json());
@@ -28,6 +29,24 @@ const initDB = async () => {
         `);
     } catch (error) {
         console.error('Error initializing database:', error);
+    }
+};
+
+const populateDB = async () => {
+    const hashedPass = bcrypt.hashSync('Password1', 10);
+    try {
+        await pool.query(`
+            INSERT INTO users (email, password_hash, first_name, last_name, type) VALUES 
+            ('joseph@example.com', '${hashedPass}', 'Joseph', 'Doe', 'vessel_owner'),
+            ('jane@example.com', '${hashedPass}', 'Jane', 'Smith', 'port_operator')
+        `);
+        console.log('Sample users inserted');
+    } catch (error) {
+        if (error.code === '23505') {
+            console.log('Sample users already exist, skipping insertion.');
+        } else {
+            console.error('Error inserting sample users:', error);
+        }
     }
 };
 
@@ -117,8 +136,10 @@ app.get('/health', async (req, res) => {
 
 waitForDB().then(() => {
   initDB().then(() => {
-    app.listen(PORT, () => {
-      console.log(`User Service running on port ${PORT}`);
+    populateDB().then(() => {
+      app.listen(PORT, () => {
+        console.log(`User Service running on port ${PORT}`);
+      });
     });
   });
 });

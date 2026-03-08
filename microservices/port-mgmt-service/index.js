@@ -46,12 +46,24 @@ const initPortDB = async () => {
                 port_name VARCHAR(255) NOT NULL,
                 address VARCHAR(255) NOT NULL,
                 capacity INTEGER NOT NULL,
-                available_charging_points INTEGER NOT NULL
+                available_charging_points INTEGER NOT NULL,
+                owner_email VARCHAR(255) NOT NULL,  
             );
         `);
         console.log('Ports table initialized');
     } catch (error) {
         console.error('Error initializing database:', error);
+    }
+
+    try{
+        await poolPort.query(`
+            INSERT INTO ports (port_name, address, capacity, available_charging_points, owner_email) VALUES 
+            ('Port of Los Angeles', 'San Pedro, CA', 20, 20, 'jane@example.com')
+            ON CONFLICT (id) DO NOTHING;
+        `);
+        console.log('Sample ports data inserted');
+    } catch (error) {
+        console.error('Error inserting sample ports data:', error);
     }
 };
 
@@ -128,10 +140,10 @@ app.post('/ports', async (req, res) => {
     }
 });
 
-app.get('/ports/:id/chargers', auth.auth, async (req, res) => {
-    const { id } = req.params;
+app.get('/ports/:port_id/chargers', auth.auth, async (req, res) => {
+    const { port_id } = req.params;
     try {
-        const result = await poolCharger.query('SELECT * FROM chargers WHERE port_id = $1', [id]);
+        const result = await poolCharger.query('SELECT * FROM chargers WHERE port_id = $1', [port_id]);
         const chargers = result.rows;
         res.json(chargers);
     } catch (error) {
@@ -140,13 +152,13 @@ app.get('/ports/:id/chargers', auth.auth, async (req, res) => {
     }   
 });
 
-app.post('/ports/:id/chargers', auth.auth, async (req, res) => {
-    const { id } = req.params;
+app.post('/ports/:port_id/chargers', auth.auth, async (req, res) => {
+    const { port_id } = req.params;
     const { type, is_available } = req.body;  
     try {
         const result = await poolCharger.query(
             'INSERT INTO chargers (port_id, type, is_available) VALUES ($1, $2, $3) RETURNING *',
-            [id, type, is_available || true]
+            [port_id, type, is_available || true]
         );
         const newCharger = result.rows[0];
         res.status(201).json(newCharger);

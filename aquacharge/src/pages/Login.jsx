@@ -6,6 +6,12 @@ const Login = ({ onLogin, onSignUpClick }) => {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
 
+    const fillTestUser = (testEmail, testPassword) => {
+        setEmail(testEmail);
+        setPassword(testPassword);
+        setError('');
+    };
+
     const submitLogin = async (e) => {
         e.preventDefault();
         setError('');
@@ -60,6 +66,26 @@ const Login = ({ onLogin, onSignUpClick }) => {
         <button onClick={onSignUpClick} className="mt-4 px-4 py-2 bg-blue-500 text-white rounded">
             Sign Up 
         </button>
+
+        <div className="mt-6">
+            <h2 className="text-lg font-semibold mb-2">Test Users</h2>
+            <div className="flex flex-col gap-2">
+                <button
+                    type="button"
+                    onClick={() => fillTestUser('joseph@example.com', 'Password1')}
+                    className="px-4 py-2 bg-slate-700 text-white rounded"
+                >
+                    Fill Vessel Owner
+                </button>
+                <button
+                    type="button"
+                    onClick={() => fillTestUser('jane@example.com', 'Password1')}
+                    className="px-4 py-2 bg-slate-700 text-white rounded"
+                >
+                    Fill Port Operator
+                </button>
+            </div>
+        </div>
     </div>
   );
 }

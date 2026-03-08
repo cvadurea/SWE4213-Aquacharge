@@ -6,6 +6,7 @@ import DashboardVO from './pages/DashboardVO'
 import DashboardPO from './pages/DashboardPO'
 import MyVessels from './pages/MyVessels'
 import MyPort from './pages/MyPort'
+import FindChargers from './pages/FindChargers'
 
 function App() {
   const [isLogin, setIsLogin] = useState(true);
@@ -58,10 +59,12 @@ function App() {
         <div>
           {isLoggedIn && userType ? (
             userType === 'vessel_owner' ? (
-              currentPage === 'dashboard' ? (
-                <DashboardVO onLogout={onLogout} onNavigate={handleNavigate} />
-              ) : (
+              currentPage === 'my-vessels' ? (
                 <MyVessels onNavigate={handleNavigate} onLogout={onLogout} />
+              ) : currentPage === 'find-chargers' ? (
+                <FindChargers onNavigate={handleNavigate} onLogout={onLogout} />
+              ) : (
+                <DashboardVO onLogout={onLogout} onNavigate={handleNavigate} />
               )
             ) : (
               currentPage === 'dashboard' ? (

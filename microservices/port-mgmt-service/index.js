@@ -47,7 +47,7 @@ const initPortDB = async () => {
                 address VARCHAR(255) NOT NULL,
                 capacity INTEGER NOT NULL,
                 available_charging_points INTEGER NOT NULL,
-                owner_email VARCHAR(255) NOT NULL,  
+                owner_email VARCHAR(255) NOT NULL
             );
         `);
         console.log('Ports table initialized');

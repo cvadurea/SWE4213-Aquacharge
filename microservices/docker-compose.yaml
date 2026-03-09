@@ -60,8 +60,9 @@ services:
       DB_NAME: bookingdb
       DB_USER: postgres
       DB_PASSWORD: postgres
-    # depends_on:
-    #   - booking-db
+      JWT_SECRET: "bwf8734tir87y2o83dyro94jo192o9sy1j8734ytrjm192y9efh879s1y379"
+    depends_on:
+      - booking-db
     networks:
       - app-network
 
@@ -182,6 +183,17 @@ services:
       - charger-data:/var/lib/postgresql/data
     depends_on:
       - port-db
+    networks:
+      - app-network
+
+  booking-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: bookingdb
+    volumes:
+      - booking-data:/var/lib/postgresql/data
     networks:
       - app-network
 

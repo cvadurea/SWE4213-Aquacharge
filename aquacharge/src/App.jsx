@@ -7,6 +7,7 @@ import DashboardPO from './pages/DashboardPO'
 import MyVessels from './pages/MyVessels'
 import MyPort from './pages/MyPort'
 import FindChargers from './pages/FindChargers'
+import MyBookings from './pages/MyBookings'
 
 function App() {
   const [isLogin, setIsLogin] = useState(true);
@@ -61,6 +62,8 @@ function App() {
             userType === 'vessel_owner' ? (
               currentPage === 'my-vessels' ? (
                 <MyVessels onNavigate={handleNavigate} onLogout={onLogout} />
+              ) : currentPage === 'my-bookings' ? (
+                <MyBookings onNavigate={handleNavigate} onLogout={onLogout} />
               ) : currentPage === 'find-chargers' ? (
                 <FindChargers onNavigate={handleNavigate} onLogout={onLogout} />
               ) : (

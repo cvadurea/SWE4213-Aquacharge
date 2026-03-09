@@ -32,7 +32,7 @@ app.use('/api/auth', authenticate, createProxyMiddleware({
 }));
 
 app.use('/api/bookings', authenticate, createProxyMiddleware({
-  target: 'http://user-service:3003',
+  target: 'http://booking-service:3003',
   changeOrigin: true,
   pathRewrite: { '^/api/bookings': '/bookings' },
 }));

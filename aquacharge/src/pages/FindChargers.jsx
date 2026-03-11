@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import SidebarVO from '../components/SidebarVO';
+import TimeslotCalendar from '../components/TimeslotCalendar';
 
 const PORT_API_BASE = import.meta.env.VITE_PORT_API_URL || 'http://localhost:3006';
 const FLEET_API_BASE = import.meta.env.VITE_FLEET_API_URL || 'http://localhost:3004';
@@ -11,8 +12,8 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 	const [selectedPort, setSelectedPort] = useState(null);
 	const [selectedVesselId, setSelectedVesselId] = useState('');
 	const [availableChargers, setAvailableChargers] = useState([]);
-	const [bookingStartTime, setBookingStartTime] = useState('');
-	const [bookingEndTime, setBookingEndTime] = useState('');
+	const [selectedCharger, setSelectedCharger] = useState(null);
+	const [showCalendar, setShowCalendar] = useState(false);
 	const [bookingStatus, setBookingStatus] = useState('');
 	const [bookingLoadingChargerId, setBookingLoadingChargerId] = useState(null);
 	const [isPortsLoading, setIsPortsLoading] = useState(true);
@@ -151,12 +152,11 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 		}
 	};
 
-	const createBooking = async (charger) => {
+	const createBooking = async (charger, timeslot) => {
 		const user = getStoredUser();
-		const token = localStorage.getItem('token');
 
-		if (!token || !user?.id) {
-			setError('Missing auth token. Please log in again.');
+		if (!user?.id) {
+			setError('Missing user information. Please log in again.');
 			return;
 		}
 
@@ -170,15 +170,8 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 			return;
 		}
 
-		if (!bookingStartTime || !bookingEndTime) {
-			setError('Please choose booking start and end times.');
-			return;
-		}
-
-		const startDate = new Date(bookingStartTime);
-		const endDate = new Date(bookingEndTime);
-		if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate <= startDate) {
-			setError('Please provide a valid booking time range.');
+		if (!timeslot?.start || !timeslot?.end) {
+			setError('Invalid timeslot selected.');
 			return;
 		}
 
@@ -191,15 +184,14 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
-					Authorization: `Bearer ${token}`,
 				},
 				body: JSON.stringify({
 					user_id: user.id,
 					vessel_id: Number(selectedVesselId),
 					port_id: selectedPort.id,
 					charger_id: charger.id,
-					start_time: startDate.toISOString(),
-					end_time: endDate.toISOString(),
+					start_time: timeslot.start,
+					end_time: timeslot.end,
 				}),
 			});
 
@@ -210,12 +202,31 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 			}
 
 			setBookingStatus(`Booking confirmed for charger #${charger.id}.`);
+			setShowCalendar(false);
+			setSelectedCharger(null);
 		} catch (err) {
 			console.error('Error creating booking:', err);
 			setError('Could not connect to booking service.');
 		} finally {
 			setBookingLoadingChargerId(null);
 		}
+	};
+
+	const handleChargerClick = (charger) => {
+		setSelectedCharger(charger);
+		setShowCalendar(true);
+		setError('');
+	};
+
+	const handleTimeslotSelect = (timeslot) => {
+		if (selectedCharger && timeslot) {
+			createBooking(selectedCharger, timeslot);
+		}
+	};
+
+	const handleCloseCalendar = () => {
+		setShowCalendar(false);
+		setSelectedCharger(null);
 	};
 
 	useEffect(() => {
@@ -272,7 +283,7 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 							<h2 className="text-xl font-semibold mb-4">Available Chargers</h2>
 
 							<div className="mb-4 space-y-3 rounded-lg border border-slate-700 bg-slate-800 p-3">
-								<p className="text-sm text-slate-300">Booking Information</p>
+								<p className="text-sm text-slate-300">Select your vessel for booking</p>
 								<select
 									value={selectedVesselId}
 									onChange={(event) => setSelectedVesselId(event.target.value)}
@@ -285,20 +296,6 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 										</option>
 									))}
 								</select>
-
-								<input
-									type="datetime-local"
-									value={bookingStartTime}
-									onChange={(event) => setBookingStartTime(event.target.value)}
-									className="w-full p-2 rounded bg-slate-900 border border-slate-700"
-								/>
-
-								<input
-									type="datetime-local"
-									value={bookingEndTime}
-									onChange={(event) => setBookingEndTime(event.target.value)}
-									className="w-full p-2 rounded bg-slate-900 border border-slate-700"
-								/>
 							</div>
 
 							{bookingStatus && <p className="text-emerald-400 mb-3 text-sm">{bookingStatus}</p>}
@@ -312,19 +309,21 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 							) : (
 								<div className="space-y-3">
 									{availableChargers.map((charger) => (
-										<div key={charger.id} className="rounded-lg border border-slate-700 bg-slate-800 p-3">
-											<p className="font-medium">Charger #{charger.id}</p>
+										<button
+											key={charger.id}
+											type="button"
+											onClick={() => handleChargerClick(charger)}
+											className="w-full rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-750 hover:border-emerald-500 p-4 text-left transition cursor-pointer"
+										>
+											<p className="font-medium text-lg">Charger #{charger.id}</p>
 											<p className="text-sm text-slate-300 mt-1">Type: {charger.type}</p>
-											<p className="text-sm text-emerald-400 mt-1">Available</p>
-											<button
-												type="button"
-												onClick={() => createBooking(charger)}
-												disabled={bookingLoadingChargerId === charger.id}
-												className="mt-3 px-3 py-2 rounded bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60"
-											>
-												{bookingLoadingChargerId === charger.id ? 'Booking...' : 'Book Charger'}
-											</button>
-										</div>
+											<div className="flex items-center justify-between mt-2">
+												<span className="inline-block text-xs px-2 py-1 rounded bg-emerald-700 text-emerald-100">
+													Available
+												</span>
+												<span className="text-sm text-emerald-400">Click to view timeslots →</span>
+											</div>
+										</button>
 									))}
 								</div>
 							)}
@@ -332,6 +331,15 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 					</div>
 				</div>
 			</main>
+
+			{showCalendar && selectedCharger && selectedPort && (
+				<TimeslotCalendar
+					charger={selectedCharger}
+					port={selectedPort}
+					onClose={handleCloseCalendar}
+					onSelectTimeslot={handleTimeslotSelect}
+				/>
+			)}
 		</div>
 	);
 };

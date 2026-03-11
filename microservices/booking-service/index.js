@@ -194,6 +194,83 @@ app.put('/bookings/:id/cancel', async (req, res) => {
     }
 });
 
+app.get('/chargers/:charger_id/timeslots', async (req, res) => {
+    const parsedChargerId = parsePositiveInt(req.params.charger_id);
+    const { start_date, end_date } = req.query;
+
+    if (!parsedChargerId) {
+        return res.status(400).json({ message: 'Invalid charger id.' });
+    }
+
+    if (!start_date || !end_date) {
+        return res.status(400).json({ message: 'start_date and end_date are required.' });
+    }
+
+    const startDate = new Date(start_date);
+    const endDate = new Date(end_date);
+
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+        return res.status(400).json({ message: 'Invalid date format.' });
+    }
+
+    if (endDate <= startDate) {
+        return res.status(400).json({ message: 'end_date must be after start_date.' });
+    }
+
+    try {
+        // Get all bookings for this charger in the date range
+        const bookingsResult = await pool.query(
+            `
+                SELECT start_time, end_time
+                FROM bookings
+                WHERE charger_id = $1
+                  AND status IN ('pending', 'confirmed')
+                  AND start_time < $3
+                  AND end_time > $2
+                ORDER BY start_time
+            `,
+            [parsedChargerId, startDate.toISOString(), endDate.toISOString()]
+        );
+
+        const bookings = bookingsResult.rows;
+
+        // Generate 15-minute timeslots
+        const timeslots = [];
+        const slotDuration = 15 * 60 * 1000; // 15 minutes in milliseconds
+        let currentTime = new Date(startDate);
+
+        while (currentTime < endDate) {
+            const slotStart = new Date(currentTime);
+            const slotEnd = new Date(currentTime.getTime() + slotDuration);
+
+            // Check if this slot overlaps with any booking
+            const isBooked = bookings.some(booking => {
+                const bookingStart = new Date(booking.start_time);
+                const bookingEnd = new Date(booking.end_time);
+                return !(slotEnd <= bookingStart || slotStart >= bookingEnd);
+            });
+
+            timeslots.push({
+                start: slotStart.toISOString(),
+                end: slotEnd.toISOString(),
+                available: !isBooked
+            });
+
+            currentTime = slotEnd;
+        }
+
+        return res.json({
+            charger_id: parsedChargerId,
+            start_date: startDate.toISOString(),
+            end_date: endDate.toISOString(),
+            timeslots
+        });
+    } catch (error) {
+        console.error('Error fetching timeslots:', error);
+        return res.status(500).json({ message: 'Server error' });
+    }
+});
+
 app.get('/health', async (req, res) => {
     try {
         await pool.query('SELECT 1');

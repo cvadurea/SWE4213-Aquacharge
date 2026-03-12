@@ -43,6 +43,14 @@ const initDB = async () => {
             );
         `);
 
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS v2g_settings (
+                id SERIAL PRIMARY KEY,
+                price_per_kwh NUMERIC(10, 4) NOT NULL,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+        `);
+
         // Add column if older DB already exists
         await pool.query(`
             ALTER TABLE bookings
@@ -162,7 +170,22 @@ app.post('/bookings', async (req, res) => {
         const booking = result.rows[0];
 
         if (normalizedType === 'bidirectional') {
-            const pricePerKwh = Number(process.env.V2G_PRICE_PER_KWH || '0.20');
+            let pricePerKwh = Number(process.env.V2G_PRICE_PER_KWH || '0.20');
+
+            try {
+                const priceResult = await pool.query(
+                    'SELECT price_per_kwh FROM v2g_settings ORDER BY updated_at DESC LIMIT 1'
+                );
+                if (priceResult.rows.length > 0) {
+                    const dbPrice = Number(priceResult.rows[0].price_per_kwh);
+                    if (Number.isFinite(dbPrice) && dbPrice > 0) {
+                        pricePerKwh = dbPrice;
+                    }
+                }
+            } catch (err) {
+                console.error('Error loading V2G price from settings, falling back to env/default:', err);
+            }
+
             const payment = pricePerKwh * energyKwh;
 
             const txResult = await pool.query(
@@ -180,6 +203,56 @@ app.post('/bookings', async (req, res) => {
         return res.status(201).json(booking);
     } catch (error) {
         console.error('Error creating booking:', error);
+        return res.status(500).json({ message: 'Server error' });
+    }
+});
+
+app.get('/v2g/price', async (req, res) => {
+    try {
+        const result = await pool.query(
+            'SELECT price_per_kwh, updated_at FROM v2g_settings ORDER BY updated_at DESC LIMIT 1'
+        );
+
+        let pricePerKwh = Number(process.env.V2G_PRICE_PER_KWH || '0.20');
+        let updatedAt = null;
+
+        if (result.rows.length > 0) {
+            const row = result.rows[0];
+            const dbPrice = Number(row.price_per_kwh);
+            if (Number.isFinite(dbPrice) && dbPrice > 0) {
+                pricePerKwh = dbPrice;
+                updatedAt = row.updated_at;
+            }
+        }
+
+        return res.json({ price_per_kwh: pricePerKwh, updated_at: updatedAt });
+    } catch (error) {
+        console.error('Error fetching V2G price:', error);
+        return res.status(500).json({ message: 'Server error' });
+    }
+});
+
+app.put('/v2g/price', async (req, res) => {
+    const { price_per_kwh } = req.body || {};
+    const parsed = Number(price_per_kwh);
+
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+        return res.status(400).json({ message: 'price_per_kwh must be a positive number.' });
+    }
+
+    try {
+        const result = await pool.query(
+            `
+                INSERT INTO v2g_settings (price_per_kwh)
+                VALUES ($1)
+                RETURNING *
+            `,
+            [parsed]
+        );
+
+        return res.status(200).json(result.rows[0]);
+    } catch (error) {
+        console.error('Error updating V2G price:', error);
         return res.status(500).json({ message: 'Server error' });
     }
 });

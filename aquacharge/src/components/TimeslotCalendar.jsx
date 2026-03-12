@@ -1,35 +1,100 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 const BOOKING_API_BASE = import.meta.env.VITE_BOOKING_API_URL || 'http://localhost:3003';
+const DRAWER_WIDTH = 175;
+const SLOT_MINUTES = 15;
+const MAX_BOOKING_MINUTES = 4 * 60;
 
 const TimeslotCalendar = ({ charger, port, onClose, onSelectTimeslot }) => {
 	const [timeslots, setTimeslots] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState('');
-	const [selectedSlot, setSelectedSlot] = useState(null);
-	const [weekStart, setWeekStart] = useState(new Date());
+	const [selectedRange, setSelectedRange] = useState(null); // { startIdx: number, endIdx: number } endIdx is boundary (exclusive)
+	const [selectedDate, setSelectedDate] = useState(() => {
+		const d = new Date();
+		d.setHours(0, 0, 0, 0);
+		return d;
+	});
+	const [selectionRect, setSelectionRect] = useState(null); // { top, left, width, height }
 
-	// Initialize to start of current week (Monday)
-	useEffect(() => {
-		const now = new Date();
-		const dayOfWeek = now.getDay();
-		const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Adjust to Monday
-		const monday = new Date(now);
-		monday.setDate(now.getDate() + diff);
-		monday.setHours(0, 0, 0, 0);
-		setWeekStart(monday);
-	}, []);
+	const gridRef = useRef(null);
+	const slotRefs = useRef([]);
+
+	const selectedIndicesSet = useMemo(() => {
+		if (!selectedRange) return new Set();
+		const set = new Set();
+		for (let i = selectedRange.startIdx; i < selectedRange.endIdx; i++) {
+			set.add(i);
+		}
+		return set;
+	}, [selectedRange]);
+
+	useLayoutEffect(() => {
+		const gridEl = gridRef.current;
+		if (!gridEl || !selectedRange) {
+			setSelectionRect(null);
+			return;
+		}
+
+		const containerRect = gridEl.getBoundingClientRect();
+		let minLeft = Infinity;
+		let minTop = Infinity;
+		let maxRight = -Infinity;
+		let maxBottom = -Infinity;
+		let found = false;
+
+		for (let i = selectedRange.startIdx; i < selectedRange.endIdx; i++) {
+			const el = slotRefs.current[i];
+			if (!el) continue;
+			const r = el.getBoundingClientRect();
+			found = true;
+			minLeft = Math.min(minLeft, r.left);
+			minTop = Math.min(minTop, r.top);
+			maxRight = Math.max(maxRight, r.right);
+			maxBottom = Math.max(maxBottom, r.bottom);
+		}
+
+		if (!found) {
+			setSelectionRect(null);
+			return;
+		}
+
+		const padding = 6;
+		setSelectionRect({
+			left: minLeft - containerRect.left - padding,
+			top: minTop - containerRect.top - padding,
+			width: maxRight - minLeft + padding * 2,
+			height: maxBottom - minTop + padding * 2,
+		});
+	}, [selectedRange, timeslots.length]);
+
+	const buildDaySlots = (availabilityMap, startOfDay) => {
+		const slots = [];
+		for (let i = 0; i < (24 * 60) / SLOT_MINUTES; i++) {
+			const slotStart = new Date(startOfDay.getTime() + i * SLOT_MINUTES * 60 * 1000);
+			const slotEnd = new Date(slotStart.getTime() + SLOT_MINUTES * 60 * 1000);
+			const key = slotStart.toISOString();
+			slots.push({
+				start: key,
+				end: slotEnd.toISOString(),
+				available: availabilityMap.get(key) !== false, // default true unless explicitly false
+			});
+		}
+		return slots;
+	};
 
 	const fetchTimeslots = async () => {
 		try {
 			setLoading(true);
 			setError('');
 
-			const weekEnd = new Date(weekStart);
-			weekEnd.setDate(weekStart.getDate() + 7);
+			const start = new Date(selectedDate);
+			start.setHours(0, 0, 0, 0);
+			const end = new Date(start);
+			end.setDate(start.getDate() + 1);
 
 			const response = await fetch(
-				`${BOOKING_API_BASE}/chargers/${charger.id}/timeslots?start_date=${weekStart.toISOString()}&end_date=${weekEnd.toISOString()}`,
+				`${BOOKING_API_BASE}/chargers/${charger.id}/timeslots?start_date=${start.toISOString()}&end_date=${end.toISOString()}`,
 				{
 					method: 'GET',
 					headers: {
@@ -43,7 +108,18 @@ const TimeslotCalendar = ({ charger, port, onClose, onSelectTimeslot }) => {
 			}
 
 			const data = await response.json();
-			setTimeslots(data.timeslots || []);
+			const raw = Array.isArray(data.timeslots) ? data.timeslots : [];
+			const availabilityMap = new Map();
+			raw.forEach((s) => {
+				if (s?.start) {
+					availabilityMap.set(String(s.start), Boolean(s.available));
+				}
+			});
+
+			// Build a full day (12:00am onward) in 15-min increments.
+			// Booked times remain visible but disabled, to allow range selection logic to validate gaps.
+			setTimeslots(buildDaySlots(availabilityMap, start));
+			setSelectedRange(null);
 		} catch (err) {
 			console.error('Error fetching timeslots:', err);
 			setError('Could not load timeslots. Please try again.');
@@ -53,44 +129,21 @@ const TimeslotCalendar = ({ charger, port, onClose, onSelectTimeslot }) => {
 	};
 
 	useEffect(() => {
-		if (weekStart) {
-			fetchTimeslots();
-		}
-	}, [weekStart, charger.id]);
+		fetchTimeslots();
+	}, [selectedDate, charger.id]);
 
-	const handlePreviousWeek = () => {
-		const newStart = new Date(weekStart);
-		newStart.setDate(weekStart.getDate() - 7);
-		setWeekStart(newStart);
+	const handlePreviousDay = () => {
+		const d = new Date(selectedDate);
+		d.setDate(d.getDate() - 1);
+		d.setHours(0, 0, 0, 0);
+		setSelectedDate(d);
 	};
 
-	const handleNextWeek = () => {
-		const newStart = new Date(weekStart);
-		newStart.setDate(weekStart.getDate() + 7);
-		setWeekStart(newStart);
-	};
-
-	const getDayLabels = () => {
-		const days = [];
-		for (let i = 0; i < 7; i++) {
-			const day = new Date(weekStart);
-			day.setDate(weekStart.getDate() + i);
-			days.push(day);
-		}
-		return days;
-	};
-
-	const getTimeslotsByDay = () => {
-		const daySlots = {};
-		timeslots.forEach((slot) => {
-			const slotDate = new Date(slot.start);
-			const dayKey = slotDate.toISOString().split('T')[0];
-			if (!daySlots[dayKey]) {
-				daySlots[dayKey] = [];
-			}
-			daySlots[dayKey].push(slot);
-		});
-		return daySlots;
+	const handleNextDay = () => {
+		const d = new Date(selectedDate);
+		d.setDate(d.getDate() + 1);
+		d.setHours(0, 0, 0, 0);
+		setSelectedDate(d);
 	};
 
 	const formatTime = (isoString) => {
@@ -99,26 +152,89 @@ const TimeslotCalendar = ({ charger, port, onClose, onSelectTimeslot }) => {
 	};
 
 	const formatDate = (date) => {
-		return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+		return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
 	};
 
-	const handleSlotClick = (slot) => {
-		if (!slot.available) return;
-		setSelectedSlot(slot);
+	const isRangeValid = (startIdx, endIdx) => {
+		if (endIdx <= startIdx) return false;
+		const minutes = (endIdx - startIdx) * SLOT_MINUTES;
+		if (minutes > MAX_BOOKING_MINUTES) return false;
+		for (let i = startIdx; i < endIdx; i++) {
+			if (!timeslots[i]?.available) return false;
+		}
+		return true;
+	};
+
+	const handleSlotClick = (slotIndex) => {
+		// Clicking a time represents choosing a boundary.
+		// First click selects a 15-min booking (slotIndex -> slotIndex+1).
+		// Subsequent clicks set the end boundary (exclusive) to allow selecting further out (e.g. 1:00 to 2:00).
+		setSelectedRange((prev) => {
+			if (!prev) {
+				const startIdx = slotIndex;
+				const endIdx = slotIndex + 1;
+				return isRangeValid(startIdx, endIdx) ? { startIdx, endIdx } : null;
+			}
+
+			const { startIdx } = prev;
+			let nextStart = startIdx;
+			let nextEnd = prev.endIdx;
+
+			if (slotIndex === startIdx && prev.endIdx === startIdx + 1) {
+				// Toggle off a single-slot selection
+				return null;
+			}
+
+			if (slotIndex < startIdx) {
+				nextStart = slotIndex;
+				nextEnd = Math.max(prev.endIdx, startIdx + 1);
+			} else if (slotIndex === startIdx) {
+				// Shrink from the start by moving start forward one slot (if possible)
+				nextStart = Math.min(prev.endIdx - 1, startIdx + 1);
+			} else {
+				// Include the clicked "end" slot in the booking range
+				nextEnd = slotIndex + 1;
+				if (nextEnd <= nextStart) nextEnd = nextStart + 1;
+			}
+
+			// Ensure end is always at least one slot after start
+			if (nextEnd <= nextStart) nextEnd = nextStart + 1;
+
+			if (!isRangeValid(nextStart, nextEnd)) {
+				return prev;
+			}
+
+			return { startIdx: nextStart, endIdx: nextEnd };
+		});
 	};
 
 	const handleConfirm = () => {
-		if (selectedSlot && onSelectTimeslot) {
-			onSelectTimeslot(selectedSlot);
-		}
+		if (!onSelectTimeslot || !selectedRange) return;
+		const { startIdx, endIdx } = selectedRange;
+		const first = timeslots[startIdx];
+		const computedEnd = timeslots[endIdx - 1]?.end;
+		if (!first?.start || !computedEnd) return;
+		onSelectTimeslot({ start: first.start, end: computedEnd });
 	};
 
-	const daySlots = getTimeslotsByDay();
-	const dayLabels = getDayLabels();
+	const selectedSummary = (() => {
+		if (!selectedRange) return null;
+		const first = timeslots[selectedRange.startIdx];
+		const computedEnd = timeslots[selectedRange.endIdx - 1]?.end;
+		if (!first?.start || !computedEnd) return null;
+		return `${formatDate(new Date(first.start))} • ${formatTime(first.start)} - ${formatTime(computedEnd)}`;
+	})();
 
 	return (
-		<div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-			<div className="bg-slate-900 rounded-lg border border-slate-700 max-w-6xl w-full max-h-[90vh] flex flex-col">
+		<div
+			className="fixed bg-black bg-opacity-75 flex items-center justify-center p-4"
+			style={{
+				inset: 0,
+				paddingLeft: DRAWER_WIDTH,
+				zIndex: 1300,
+			}}
+		>
+			<div className="bg-slate-900 rounded-lg border border-slate-700 max-w-3xl w-full max-h-[90vh] flex flex-col">
 				{/* Header */}
 				<div className="p-4 border-b border-slate-700 flex justify-between items-center">
 					<div>
@@ -136,24 +252,24 @@ const TimeslotCalendar = ({ charger, port, onClose, onSelectTimeslot }) => {
 					</button>
 				</div>
 
-				{/* Week Navigation */}
+				{/* Day Navigation */}
 				<div className="p-4 border-b border-slate-700 flex justify-between items-center">
 					<button
-						onClick={handlePreviousWeek}
+						onClick={handlePreviousDay}
 						className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded border border-slate-600"
 						type="button"
 					>
-						← Previous Week
+						← Previous Day
 					</button>
 					<span className="font-semibold">
-						{formatDate(dayLabels[0])} - {formatDate(dayLabels[6])}
+						{formatDate(selectedDate)}
 					</span>
 					<button
-						onClick={handleNextWeek}
+						onClick={handleNextDay}
 						className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded border border-slate-600"
 						type="button"
 					>
-						Next Week →
+						Next Day →
 					</button>
 				</div>
 
@@ -163,49 +279,56 @@ const TimeslotCalendar = ({ charger, port, onClose, onSelectTimeslot }) => {
 						<p className="text-center text-slate-300">Loading timeslots...</p>
 					) : error ? (
 						<p className="text-center text-red-400">{error}</p>
+					) : timeslots.length === 0 ? (
+						<p className="text-center text-slate-300">No available slots for this day.</p>
 					) : (
-						<div className="grid grid-cols-7 gap-2">
-							{dayLabels.map((day) => {
-								const dayKey = day.toISOString().split('T')[0];
-								const slots = daySlots[dayKey] || [];
+						<div className="relative">
+							{selectionRect && (
+								<div
+									style={{
+										position: 'absolute',
+										left: selectionRect.left,
+										top: selectionRect.top,
+										width: selectionRect.width,
+										height: selectionRect.height,
+										border: '3px solid black',
+										borderRadius: 12,
+										pointerEvents: 'none',
+										boxSizing: 'border-box',
+										zIndex: 1,
+									}}
+								/>
+							)}
 
+							<div ref={gridRef} className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+							{timeslots.map((slot, idx) => {
+								const isSelected = selectedIndicesSet.has(idx);
 								return (
-									<div key={dayKey} className="border border-slate-700 rounded-lg overflow-hidden">
-										{/* Day Header */}
-										<div className="bg-slate-800 p-2 text-center font-semibold text-sm">
-											{formatDate(day)}
-										</div>
-
-										{/* Timeslots */}
-										<div className="max-h-96 overflow-y-auto">
-											{slots.length === 0 ? (
-												<p className="text-xs text-slate-400 p-2 text-center">No slots</p>
-											) : (
-												slots.map((slot, idx) => (
-													<button
-														key={idx}
-														type="button"
-														onClick={() => handleSlotClick(slot)}
-														disabled={!slot.available}
-														className={`w-full p-2 text-xs border-t border-slate-700 text-left transition ${
-															selectedSlot === slot
-																? 'bg-emerald-600 text-white'
-																: slot.available
-																? 'bg-slate-800 hover:bg-slate-700 cursor-pointer'
-																: 'bg-slate-900 text-slate-500 cursor-not-allowed'
-														}`}
-													>
-														{formatTime(slot.start)}
-														{!slot.available && (
-															<span className="block text-xs text-red-400">Booked</span>
-														)}
-													</button>
-												))
-											)}
-										</div>
-									</div>
+									<button
+										key={`${slot.start}-${slot.end}`}
+										type="button"
+										onClick={() => handleSlotClick(idx)}
+										disabled={!slot.available}
+										ref={(el) => {
+											slotRefs.current[idx] = el;
+										}}
+										className="p-2 text-xs rounded border transition text-left"
+										style={{
+											backgroundColor: !slot.available
+												? '#ffffff'
+												: isSelected
+													? '#bae6fd'
+													: 'transparent',
+											borderColor: !slot.available ? '#e5e7eb' : isSelected ? '#000000' : '#e5e7eb',
+											color: !slot.available ? '#9ca3af' : isSelected ? '#1d4ed8' : '#0f172a',
+											cursor: !slot.available ? 'not-allowed' : 'pointer',
+										}}
+									>
+										{formatTime(slot.start)}
+									</button>
 								);
 							})}
+							</div>
 						</div>
 					)}
 				</div>
@@ -213,12 +336,10 @@ const TimeslotCalendar = ({ charger, port, onClose, onSelectTimeslot }) => {
 				{/* Footer */}
 				<div className="p-4 border-t border-slate-700 flex justify-between items-center">
 					<div className="text-sm text-slate-400">
-						{selectedSlot ? (
-							<span>
-								Selected: {formatDate(new Date(selectedSlot.start))} at {formatTime(selectedSlot.start)}
-							</span>
+						{selectedSummary ? (
+							<span>Selected: {selectedSummary}</span>
 						) : (
-							<span>Select an available time slot</span>
+							<span>Select a start time, then click a later time to set the end (max 4 hours)</span>
 						)}
 					</div>
 					<div className="flex gap-2">
@@ -231,7 +352,7 @@ const TimeslotCalendar = ({ charger, port, onClose, onSelectTimeslot }) => {
 						</button>
 						<button
 							onClick={handleConfirm}
-							disabled={!selectedSlot}
+							disabled={!selectedRange}
 							className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded disabled:opacity-50 disabled:cursor-not-allowed"
 							type="button"
 						>

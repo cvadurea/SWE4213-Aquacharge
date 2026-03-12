@@ -112,7 +112,7 @@ const MyBookings = ({ onNavigate, onLogout }) => {
         <div className="min-h-screen bg-slate-950 text-white flex">
             <SidebarVO onNavigate={onNavigate} onLogout={onLogout} />
 
-            <main className="flex-1 p-6">
+            <main className="flex-1 p-6" style={{ marginLeft: 175 }}>
                 <div className="max-w-7xl mx-auto">
                     <div className="mb-8">
                         <h1 className="text-4xl font-bold">My Bookings</h1>

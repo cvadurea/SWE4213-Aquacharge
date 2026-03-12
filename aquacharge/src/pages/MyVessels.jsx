@@ -163,11 +163,16 @@ const MyVessels = ({ onNavigate, onLogout }) => {
         }
     };
 
+    const orderedVessels = [...vessels].sort((a, b) => {
+        if (a.is_primary === b.is_primary) return 0;
+        return a.is_primary ? -1 : 1;
+    });
+
     return (
         <div className="min-h-screen bg-slate-950 text-white flex">
       <SidebarVO onNavigate={onNavigate} onLogout={onLogout} />
 
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-6" style={{ marginLeft: 175 }}>
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-8">
             <div>
@@ -178,18 +183,34 @@ const MyVessels = ({ onNavigate, onLogout }) => {
 
           {error && <p className="text-red-400 mb-4">{error}</p>}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
             <button
               type="button"
               onClick={() => setIsModalOpen(true)}
-              className="aspect-square rounded-lg border-2 border-dashed border-slate-600 hover:border-emerald-500 bg-slate-900 hover:bg-slate-800 transition flex flex-col items-center justify-center"
+              className="rounded-lg border-2 border-dashed border-slate-600 hover:border-emerald-500 bg-slate-900 hover:bg-slate-800 transition flex flex-col items-center justify-center"
+              style={{ width: 140, height: 80 }}
             >
-              <span className="text-5xl leading-none">+</span>
-              <span className="mt-2 font-medium">Create Vessel</span>
+              <span className="text-3xl leading-none">+</span>
+              <span className="mt-1 text-sm font-medium">Add Vessel</span>
             </button>
+          </div>
 
-            {vessels.map((vessel) => (
-              <VesselCard key={vessel.id} vessel={vessel} />
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              gap: 24,
+              alignItems: 'stretch',
+            }}
+          >
+            {orderedVessels.map((vessel) => (
+              <div
+                key={`${vessel.id}-${vessel.is_primary}`}
+                style={{ width: 192, flexShrink: 0 }}
+              >
+                <VesselCard vessel={vessel} onPrimarySet={getVessels} />
+              </div>
             ))}
           </div>
         </div>

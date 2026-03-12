@@ -9,8 +9,8 @@ const BOOKING_API_BASE = import.meta.env.VITE_BOOKING_API_URL || 'http://localho
 const FindChargers = ({ onNavigate, onLogout }) => {
 	const [ports, setPorts] = useState([]);
 	const [vessels, setVessels] = useState([]);
+	const [primaryVessel, setPrimaryVessel] = useState(null);
 	const [selectedPort, setSelectedPort] = useState(null);
-	const [selectedVesselId, setSelectedVesselId] = useState('');
 	const [availableChargers, setAvailableChargers] = useState([]);
 	const [selectedCharger, setSelectedCharger] = useState(null);
 	const [showCalendar, setShowCalendar] = useState(false);
@@ -99,8 +99,14 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 
 			const vesselList = Array.isArray(data) ? data : [];
 			setVessels(vesselList);
-			if (vesselList.length > 0) {
-				setSelectedVesselId(String(vesselList[0].id));
+
+			// Find and set the primary vessel
+			const primary = vesselList.find((v) => v.is_primary);
+			if (primary) {
+				setPrimaryVessel(primary);
+			} else if (vesselList.length > 0) {
+				// If no primary vessel is set, alert the user
+				setError('No primary vessel set. Please set a primary vessel in My Vessels before booking.');
 			}
 		} catch (err) {
 			console.error('Error fetching vessels:', err);
@@ -165,8 +171,8 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 			return;
 		}
 
-		if (!selectedVesselId) {
-			setError('Please select a vessel before booking.');
+		if (!primaryVessel?.id) {
+			setError('No primary vessel set. Please set a primary vessel in My Vessels before booking.');
 			return;
 		}
 
@@ -187,7 +193,7 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 				},
 				body: JSON.stringify({
 					user_id: user.id,
-					vessel_id: Number(selectedVesselId),
+					vessel_id: Number(primaryVessel.id),
 					port_id: selectedPort.id,
 					charger_id: charger.id,
 					start_time: timeslot.start,
@@ -201,7 +207,7 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 				return;
 			}
 
-			setBookingStatus(`Booking confirmed for charger #${charger.id}.`);
+			setBookingStatus(`Booking confirmed for charger #${charger.id} using ${primaryVessel.vessel_name}.`);
 			setShowCalendar(false);
 			setSelectedCharger(null);
 		} catch (err) {
@@ -283,19 +289,19 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 							<h2 className="text-xl font-semibold mb-4">Available Chargers</h2>
 
 							<div className="mb-4 space-y-3 rounded-lg border border-slate-700 bg-slate-800 p-3">
-								<p className="text-sm text-slate-300">Select your vessel for booking</p>
-								<select
-									value={selectedVesselId}
-									onChange={(event) => setSelectedVesselId(event.target.value)}
-									className="w-full p-2 rounded bg-slate-900 border border-slate-700"
-								>
-									<option value="">Select vessel</option>
-									{vessels.map((vessel) => (
-										<option key={vessel.id} value={String(vessel.id)}>
-											{vessel.vessel_name}
-										</option>
-									))}
-								</select>
+								<p className="text-sm font-semibold mb-3">Booking Vessel</p>
+								{primaryVessel ? (
+									<div className="bg-slate-900 border border-slate-600 rounded p-3">
+										<p className="font-semibold text-emerald-400">{primaryVessel.vessel_name}</p>
+									</div>
+								) : (
+									<div className="bg-slate-900 border border-red-700 rounded p-3">
+										<p className="text-red-400 font-semibold">No Primary Vessel Set</p>
+										<p className="text-xs text-slate-400 mt-1">
+											Please set a primary vessel in My Vessels before booking.
+										</p>
+									</div>
+								)}
 							</div>
 
 							{bookingStatus && <p className="text-emerald-400 mb-3 text-sm">{bookingStatus}</p>}

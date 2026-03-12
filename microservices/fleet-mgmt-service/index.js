@@ -40,6 +40,13 @@ const initDB = async () => {
                 is_primary BOOLEAN NOT NULL DEFAULT FALSE
             );
         `);
+
+        // Ensure registration numbers are unique per owner
+        await pool.query(`
+            CREATE UNIQUE INDEX IF NOT EXISTS vessels_owner_reg_unique_idx
+            ON vessels(owner_id, registration_number);
+        `);
+
         console.log('Vessels table initialized');
     } catch (error) {
         console.error('Error initializing database:', error);
@@ -88,15 +95,50 @@ app.post('/vessels', auth.auth, async (req, res) => {
     if (!owner_id || !vessel_name || !vessel_model || !registration_number || !battery_capacity) {
         return res.status(400).json({ message: 'All fields except is_primary are required' });
     }
+    let client;
     try {
-        const result = await pool.query(
-            'INSERT INTO vessels (owner_id, vessel_name, vessel_model, registration_number, battery_capacity, is_primary) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-            [owner_id, vessel_name, vessel_model, registration_number, battery_capacity, is_primary || false]
-        );
-        res.status(201).json(result.rows[0]);
+        client = await pool.connect();
+        await client.query('BEGIN');
+
+        let created;
+
+        if (is_primary) {
+            // Ensure this is the only primary vessel for this owner
+            await client.query(
+                'UPDATE vessels SET is_primary = FALSE WHERE owner_id = $1',
+                [owner_id]
+            );
+            const insertResult = await client.query(
+                'INSERT INTO vessels (owner_id, vessel_name, vessel_model, registration_number, battery_capacity, is_primary) VALUES ($1, $2, $3, $4, $5, TRUE) RETURNING *',
+                [owner_id, vessel_name, vessel_model, registration_number, battery_capacity]
+            );
+            created = insertResult.rows[0];
+        } else {
+            const insertResult = await client.query(
+                'INSERT INTO vessels (owner_id, vessel_name, vessel_model, registration_number, battery_capacity, is_primary) VALUES ($1, $2, $3, $4, $5, FALSE) RETURNING *',
+                [owner_id, vessel_name, vessel_model, registration_number, battery_capacity]
+            );
+            created = insertResult.rows[0];
+        }
+
+        await client.query('COMMIT');
+        res.status(201).json(created);
     } catch (error) {
+        if (client) {
+            try {
+                await client.query('ROLLBACK');
+            } catch (_) {}
+        }
+
+        if (error && error.code === '23505') {
+            // Unique violation on (owner_id, registration_number)
+            return res.status(409).json({ message: 'A vessel with this registration number already exists for this owner.' });
+        }
+
         console.error('Error creating vessel:', error);
         res.status(500).json({ message: 'Server error' });
+    } finally {
+        if (client) client.release();
     }
 });
 

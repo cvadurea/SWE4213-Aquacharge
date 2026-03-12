@@ -14,6 +14,10 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 	const [availableChargers, setAvailableChargers] = useState([]);
 	const [selectedCharger, setSelectedCharger] = useState(null);
 	const [showCalendar, setShowCalendar] = useState(false);
+	const [pendingTimeslot, setPendingTimeslot] = useState(null);
+	const [showBookingTypeModal, setShowBookingTypeModal] = useState(false);
+	const [bookingType, setBookingType] = useState('regular');
+	const [dischargeKwh, setDischargeKwh] = useState('');
 	const [bookingStatus, setBookingStatus] = useState('');
 	const [bookingLoadingChargerId, setBookingLoadingChargerId] = useState(null);
 	const [isPortsLoading, setIsPortsLoading] = useState(true);
@@ -158,7 +162,7 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 		}
 	};
 
-	const createBooking = async (charger, timeslot) => {
+	const createBooking = async (charger, timeslot, options = {}) => {
 		const user = getStoredUser();
 
 		if (!user?.id) {
@@ -198,6 +202,8 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 					charger_id: charger.id,
 					start_time: timeslot.start,
 					end_time: timeslot.end,
+					booking_type: options.booking_type || 'regular',
+					energy_discharged_kwh: options.energy_discharged_kwh,
 				}),
 			});
 
@@ -207,9 +213,17 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 				return;
 			}
 
-			setBookingStatus(`Booking confirmed for charger #${charger.id} using ${primaryVessel.vessel_name}.`);
+			if (data?.v2g_transaction) {
+				setBookingStatus(
+					`Booking confirmed (V2G) for charger #${charger.id} using ${primaryVessel.vessel_name}. Discharge: ${data.v2g_transaction.energy_discharged} kWh.`
+				);
+			} else {
+				setBookingStatus(`Booking confirmed for charger #${charger.id} using ${primaryVessel.vessel_name}.`);
+			}
 			setShowCalendar(false);
 			setSelectedCharger(null);
+			setPendingTimeslot(null);
+			setShowBookingTypeModal(false);
 		} catch (err) {
 			console.error('Error creating booking:', err);
 			setError('Could not connect to booking service.');
@@ -226,8 +240,41 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 
 	const handleTimeslotSelect = (timeslot) => {
 		if (selectedCharger && timeslot) {
-			createBooking(selectedCharger, timeslot);
+			if (String(selectedCharger.type || '').toLowerCase() === 'bidirectional') {
+				setPendingTimeslot(timeslot);
+				setBookingType('regular');
+				setDischargeKwh('');
+				setShowBookingTypeModal(true);
+				return;
+			}
+
+			createBooking(selectedCharger, timeslot, { booking_type: 'regular' });
 		}
+	};
+
+	const closeBookingTypeModal = () => {
+		setShowBookingTypeModal(false);
+		setPendingTimeslot(null);
+		setBookingType('regular');
+		setDischargeKwh('');
+	};
+
+	const confirmBookingType = () => {
+		if (!selectedCharger || !pendingTimeslot) return;
+		if (bookingType === 'bidirectional') {
+			const parsed = Number(dischargeKwh);
+			if (!Number.isFinite(parsed) || parsed <= 0) {
+				setError('Please enter a valid kWh discharge amount.');
+				return;
+			}
+			createBooking(selectedCharger, pendingTimeslot, {
+				booking_type: 'bidirectional',
+				energy_discharged_kwh: parsed,
+			});
+			return;
+		}
+
+		createBooking(selectedCharger, pendingTimeslot, { booking_type: 'regular' });
 	};
 
 	const handleCloseCalendar = () => {
@@ -344,6 +391,142 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 					onClose={handleCloseCalendar}
 					onSelectTimeslot={handleTimeslotSelect}
 				/>
+			)}
+
+			{showBookingTypeModal && (
+				<div
+					style={{
+						position: 'fixed',
+						inset: 0,
+						zIndex: 1400,
+						background: 'rgba(0,0,0,0.6)',
+						display: 'flex',
+						alignItems: 'center',
+						justifyContent: 'center',
+						padding: 16,
+					}}
+				>
+					<div
+						style={{
+							width: '100%',
+							maxWidth: 520,
+							background: '#0f172a',
+							border: '1px solid #334155',
+							borderRadius: 12,
+							padding: 16,
+							color: '#e2e8f0',
+						}}
+					>
+						<div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+							<div>
+								<h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Booking Type</h2>
+								<p style={{ margin: '6px 0 0 0', color: '#94a3b8', fontSize: 13 }}>
+									Charger #{selectedCharger?.id} supports bidirectional bookings.
+								</p>
+							</div>
+							<button
+								type="button"
+								onClick={closeBookingTypeModal}
+								style={{
+									border: '1px solid #334155',
+									background: 'transparent',
+									color: '#e2e8f0',
+									borderRadius: 8,
+									padding: '6px 10px',
+									cursor: 'pointer',
+								}}
+							>
+								✕
+							</button>
+						</div>
+
+						<div style={{ marginTop: 14 }}>
+							<label style={{ display: 'block', fontSize: 13, color: '#cbd5e1', marginBottom: 8 }}>
+								Select mode
+							</label>
+							<div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+								<label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+									<input
+										type="radio"
+										name="bookingType"
+										value="regular"
+										checked={bookingType === 'regular'}
+										onChange={() => setBookingType('regular')}
+									/>
+									Regular
+								</label>
+								<label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+									<input
+										type="radio"
+										name="bookingType"
+										value="bidirectional"
+										checked={bookingType === 'bidirectional'}
+										onChange={() => setBookingType('bidirectional')}
+									/>
+									Bidirectional (V2G)
+								</label>
+							</div>
+						</div>
+
+						{bookingType === 'bidirectional' && (
+							<div style={{ marginTop: 14 }}>
+								<label style={{ display: 'block', fontSize: 13, color: '#cbd5e1', marginBottom: 8 }}>
+									Energy to discharge to the grid (kWh)
+								</label>
+								<input
+									type="number"
+									min="0"
+									step="0.1"
+									value={dischargeKwh}
+									onChange={(e) => setDischargeKwh(e.target.value)}
+									style={{
+										width: '100%',
+										padding: '10px 12px',
+										borderRadius: 10,
+										border: '1px solid #334155',
+										background: '#020617',
+										color: '#e2e8f0',
+									}}
+									placeholder="e.g. 10"
+								/>
+								<p style={{ margin: '8px 0 0 0', color: '#94a3b8', fontSize: 12 }}>
+									Your transaction will record price/kWh and total payment.
+								</p>
+							</div>
+						)}
+
+						<div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+							<button
+								type="button"
+								onClick={closeBookingTypeModal}
+								style={{
+									border: '1px solid #334155',
+									background: '#334155',
+									color: '#e2e8f0',
+									borderRadius: 10,
+									padding: '10px 12px',
+									cursor: 'pointer',
+								}}
+							>
+								Cancel
+							</button>
+							<button
+								type="button"
+								onClick={confirmBookingType}
+								style={{
+									border: '1px solid #0ea5e9',
+									background: '#0284c7',
+									color: 'white',
+									borderRadius: 10,
+									padding: '10px 12px',
+									cursor: 'pointer',
+								}}
+							>
+								Confirm
+							</button>
+						</div>
+					</div>
+				</div>
 			)}
 		</div>
 	);

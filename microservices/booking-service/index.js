@@ -37,10 +37,29 @@ const initDB = async () => {
                 charger_id INTEGER NOT NULL,
                 start_time TIMESTAMPTZ NOT NULL,
                 end_time TIMESTAMPTZ NOT NULL,
+                type VARCHAR(30) NOT NULL DEFAULT 'regular',
                 status VARCHAR(20) NOT NULL DEFAULT 'confirmed',
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
         `);
+
+        // Add column if older DB already exists
+        await pool.query(`
+            ALTER TABLE bookings
+            ADD COLUMN IF NOT EXISTS type VARCHAR(30) NOT NULL DEFAULT 'regular';
+        `);
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS v2g_transactions (
+                transaction_id SERIAL PRIMARY KEY,
+                booking_id INTEGER NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+                price_per_kwh NUMERIC(10, 4) NOT NULL,
+                energy_discharged NUMERIC(12, 4) NOT NULL,
+                payment NUMERIC(12, 4) NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+        `);
+
         console.log('Bookings table initialized');
     } catch (error) {
         console.error('Error initializing bookings database:', error);
@@ -70,7 +89,7 @@ const parsePositiveInt = (value) => {
 };
 
 app.post('/bookings', async (req, res) => {
-    const { user_id, vessel_id, port_id, charger_id, start_time, end_time } = req.body;
+    const { user_id, vessel_id, port_id, charger_id, start_time, end_time, booking_type, energy_discharged_kwh } = req.body;
 
     const parsedUserId = parsePositiveInt(user_id);
     const parsedVesselId = parsePositiveInt(vessel_id);
@@ -93,6 +112,20 @@ app.post('/bookings', async (req, res) => {
     }
 
     try {
+        const normalizedType = String(booking_type || 'regular').toLowerCase();
+        if (!['regular', 'bidirectional'].includes(normalizedType)) {
+            return res.status(400).json({ message: "booking_type must be 'regular' or 'bidirectional'." });
+        }
+
+        let energyKwh = null;
+        if (normalizedType === 'bidirectional') {
+            const parsedEnergy = Number(energy_discharged_kwh);
+            if (!Number.isFinite(parsedEnergy) || parsedEnergy <= 0) {
+                return res.status(400).json({ message: 'energy_discharged_kwh must be a positive number for bidirectional bookings.' });
+            }
+            energyKwh = parsedEnergy;
+        }
+
         const overlapResult = await pool.query(
             `
                 SELECT id
@@ -111,8 +144,8 @@ app.post('/bookings', async (req, res) => {
 
         const result = await pool.query(
             `
-                INSERT INTO bookings (user_id, vessel_id, port_id, charger_id, start_time, end_time, status)
-                VALUES ($1, $2, $3, $4, $5, $6, 'confirmed')
+                INSERT INTO bookings (user_id, vessel_id, port_id, charger_id, start_time, end_time, type, status)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, 'confirmed')
                 RETURNING *
             `,
             [
@@ -122,10 +155,29 @@ app.post('/bookings', async (req, res) => {
                 parsedChargerId,
                 startTime.toISOString(),
                 endTime.toISOString(),
+                normalizedType,
             ]
         );
 
-        return res.status(201).json(result.rows[0]);
+        const booking = result.rows[0];
+
+        if (normalizedType === 'bidirectional') {
+            const pricePerKwh = Number(process.env.V2G_PRICE_PER_KWH || '0.20');
+            const payment = pricePerKwh * energyKwh;
+
+            const txResult = await pool.query(
+                `
+                    INSERT INTO v2g_transactions (booking_id, price_per_kwh, energy_discharged, payment)
+                    VALUES ($1, $2, $3, $4)
+                    RETURNING *
+                `,
+                [booking.id, pricePerKwh, energyKwh, payment]
+            );
+
+            return res.status(201).json({ ...booking, v2g_transaction: txResult.rows[0] });
+        }
+
+        return res.status(201).json(booking);
     } catch (error) {
         console.error('Error creating booking:', error);
         return res.status(500).json({ message: 'Server error' });
@@ -141,7 +193,20 @@ app.get('/bookings/user/:user_id', async (req, res) => {
 
     try {
         const result = await pool.query(
-            'SELECT * FROM bookings WHERE user_id = $1 ORDER BY start_time DESC',
+            `
+                SELECT
+                    b.*,
+                    (
+                        SELECT row_to_json(t)
+                        FROM v2g_transactions t
+                        WHERE t.booking_id = b.id
+                        ORDER BY t.created_at DESC
+                        LIMIT 1
+                    ) AS v2g_transaction
+                FROM bookings b
+                WHERE b.user_id = $1
+                ORDER BY b.start_time DESC
+            `,
             [parsedUserId]
         );
         return res.json(result.rows);

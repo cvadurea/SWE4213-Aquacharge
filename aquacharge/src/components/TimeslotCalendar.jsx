@@ -88,10 +88,21 @@ const TimeslotCalendar = ({ charger, port, onClose, onSelectTimeslot }) => {
 			setLoading(true);
 			setError('');
 
+			const todayStart = new Date();
+			todayStart.setHours(0, 0, 0, 0);
+
 			const start = new Date(selectedDate);
 			start.setHours(0, 0, 0, 0);
 			const end = new Date(start);
 			end.setDate(start.getDate() + 1);
+
+			// Prevent fetching past days
+			if (start < todayStart) {
+				setSelectedDate(todayStart);
+				setTimeslots([]);
+				setSelectedRange(null);
+				return;
+			}
 
 			const response = await fetch(
 				`${BOOKING_API_BASE}/chargers/${charger.id}/timeslots?start_date=${start.toISOString()}&end_date=${end.toISOString()}`,
@@ -118,7 +129,15 @@ const TimeslotCalendar = ({ charger, port, onClose, onSelectTimeslot }) => {
 
 			// Build a full day (12:00am onward) in 15-min increments.
 			// Booked times remain visible but disabled, to allow range selection logic to validate gaps.
-			setTimeslots(buildDaySlots(availabilityMap, start));
+			let daySlots = buildDaySlots(availabilityMap, start);
+
+			// Requirement: available slots shown should not be in the past relative to current time
+			const now = new Date();
+			if (start.getTime() === todayStart.getTime()) {
+				daySlots = daySlots.filter((s) => new Date(s.end) > now);
+			}
+
+			setTimeslots(daySlots);
 			setSelectedRange(null);
 		} catch (err) {
 			console.error('Error fetching timeslots:', err);
@@ -133,9 +152,12 @@ const TimeslotCalendar = ({ charger, port, onClose, onSelectTimeslot }) => {
 	}, [selectedDate, charger.id]);
 
 	const handlePreviousDay = () => {
+		const todayStart = new Date();
+		todayStart.setHours(0, 0, 0, 0);
 		const d = new Date(selectedDate);
 		d.setDate(d.getDate() - 1);
 		d.setHours(0, 0, 0, 0);
+		if (d < todayStart) return;
 		setSelectedDate(d);
 	};
 
@@ -254,13 +276,21 @@ const TimeslotCalendar = ({ charger, port, onClose, onSelectTimeslot }) => {
 
 				{/* Day Navigation */}
 				<div className="p-4 border-b border-slate-700 flex justify-between items-center">
+					{(() => {
+						const todayStart = new Date();
+						todayStart.setHours(0, 0, 0, 0);
+						const canGoPrev = selectedDate.getTime() > todayStart.getTime();
+						return (
 					<button
 						onClick={handlePreviousDay}
+						disabled={!canGoPrev}
 						className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded border border-slate-600"
 						type="button"
 					>
 						← Previous Day
 					</button>
+						);
+					})()}
 					<span className="font-semibold">
 						{formatDate(selectedDate)}
 					</span>

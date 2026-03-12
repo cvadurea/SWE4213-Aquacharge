@@ -133,11 +133,31 @@ const MyBookings = ({ onNavigate, onLogout }) => {
                                     <p className="text-sm text-slate-300 mt-1">Port: {booking.port_id} • Charger: {booking.charger_id}</p>
                                     <p className="text-sm text-slate-300">Vessel: {booking.vessel_id}</p>
                                     <p className="text-sm text-slate-300">
+                                        Type: {booking.type || 'regular'}
+                                    </p>
+                                    <p className="text-sm text-slate-300">
                                         Start: {new Date(booking.start_time).toLocaleString()}
                                     </p>
                                     <p className="text-sm text-slate-300">
                                         End: {new Date(booking.end_time).toLocaleString()}
                                     </p>
+
+                                    {(booking.type === 'bidirectional' || booking.v2g_transaction) && (
+                                        <div className="mt-3 rounded border border-slate-700 bg-slate-950 p-3">
+                                            <p className="text-sm font-semibold text-slate-200">V2G Transaction</p>
+                                            {booking.v2g_transaction ? (
+                                                <div className="mt-2 space-y-1 text-sm text-slate-300">
+                                                    <p>Price per kWh: {booking.v2g_transaction.price_per_kwh}</p>
+                                                    <p>Energy discharged (kWh): {booking.v2g_transaction.energy_discharged}</p>
+                                                    <p>Total payment: {booking.v2g_transaction.payment}</p>
+                                                </div>
+                                            ) : (
+                                                <p className="mt-2 text-sm text-slate-400">
+                                                    V2G details unavailable for this booking.
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
                                     <p className="text-sm mt-1">
                                         Status:{' '}
                                         <span

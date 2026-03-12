@@ -122,6 +122,20 @@ const MyVessels = ({ onNavigate, onLogout }) => {
             return;
         }
 
+        const trimmedReg = formData.registration_number.trim();
+        if (!trimmedReg) {
+            setError('Registration number cannot be empty.');
+            return;
+        }
+
+        const duplicate = vessels.find(
+            (v) => String(v.registration_number).toLowerCase() === trimmedReg.toLowerCase()
+        );
+        if (duplicate) {
+            setError('You already have a vessel with this registration number.');
+            return;
+        }
+
         setIsSubmitting(true);
         setError('');
 
@@ -136,7 +150,7 @@ const MyVessels = ({ onNavigate, onLogout }) => {
                     owner_id: String(user.id),
                     vessel_name: formData.vessel_name,
                     vessel_model: formData.vessel_model,
-                    registration_number: formData.registration_number,
+                    registration_number: trimmedReg,
                     battery_capacity: Number(formData.battery_capacity),
                     is_primary: formData.is_primary,
                 }),
@@ -181,7 +195,7 @@ const MyVessels = ({ onNavigate, onLogout }) => {
             </div>
           </div>
 
-          {error && <p className="text-red-400 mb-4">{error}</p>}
+          {error && <p className="text-red-400 mb-4" style={{ fontSize: 14, fontWeight: 600 }}>{error}</p>}
 
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
             <button
@@ -217,11 +231,50 @@ const MyVessels = ({ onNavigate, onLogout }) => {
       </main>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-          <div className="w-full max-w-lg bg-slate-900 rounded-lg p-6 border border-slate-700">
-            <h2 className="text-2xl font-semibold mb-4">Create Vessel</h2>
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1400,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 520,
+              background: '#0f172a',
+              border: '1px solid #334155',
+              borderRadius: 12,
+              padding: 16,
+              color: '#e2e8f0',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+              <h2 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Create Vessel</h2>
+              <button
+                type="button"
+                onClick={closeModal}
+                disabled={isSubmitting}
+                style={{
+                  border: '1px solid #334155',
+                  background: 'transparent',
+                  color: '#e2e8f0',
+                  borderRadius: 8,
+                  padding: '6px 10px',
+                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                  opacity: isSubmitting ? 0.6 : 1,
+                }}
+              >
+                ✕
+              </button>
+            </div>
 
-            <form onSubmit={createVessel} className="space-y-4">
+            <form onSubmit={createVessel} style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
               <input
                 name="vessel_name"
                 value={formData.vessel_name}
@@ -238,14 +291,27 @@ const MyVessels = ({ onNavigate, onLogout }) => {
                 className="w-full p-2 rounded bg-slate-800 border border-slate-700"
                 required
               />
-              <input
-                name="registration_number"
-                value={formData.registration_number}
-                onChange={onInputChange}
-                placeholder="Registration Number"
-                className="w-full p-2 rounded bg-slate-800 border border-slate-700"
-                required
-              />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <input
+                  name="registration_number"
+                  value={formData.registration_number}
+                  onChange={onInputChange}
+                  placeholder="Registration Number"
+                  className="w-full p-2 rounded bg-slate-800 border border-slate-700"
+                  required
+                  style={
+                    error &&
+                    error.toLowerCase().includes('registration number')
+                      ? { borderColor: '#f97373', boxShadow: '0 0 0 1px #f97373' }
+                      : undefined
+                  }
+                />
+                {error && error.toLowerCase().includes('registration number') && (
+                  <span style={{ color: '#f97373', fontSize: 12 }}>
+                    {error}
+                  </span>
+                )}
+              </div>
               <input
                 name="battery_capacity"
                 value={formData.battery_capacity}
@@ -267,19 +333,35 @@ const MyVessels = ({ onNavigate, onLogout }) => {
                 Set as primary vessel
               </label>
 
-              <div className="flex justify-end gap-3 pt-2">
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="px-4 py-2 rounded bg-slate-700 hover:bg-slate-600"
                   disabled={isSubmitting}
+                  style={{
+                    border: '1px solid #334155',
+                    background: '#334155',
+                    color: '#e2e8f0',
+                    borderRadius: 10,
+                    padding: '10px 12px',
+                    cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                    opacity: isSubmitting ? 0.6 : 1,
+                  }}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700"
                   disabled={isSubmitting}
+                  style={{
+                    border: '1px solid #16a34a',
+                    background: '#16a34a',
+                    color: 'white',
+                    borderRadius: 10,
+                    padding: '10px 12px',
+                    cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                    opacity: isSubmitting ? 0.6 : 1,
+                  }}
                 >
                   {isSubmitting ? 'Creating...' : 'Create Vessel'}
                 </button>

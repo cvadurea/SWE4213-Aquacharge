@@ -79,18 +79,68 @@ const VesselCard = ({ vessel, onPrimarySet }) => {
 			</div>
 
 			{showConfirm && (
-				<div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-					<div className="bg-slate-900 rounded-lg border border-slate-700 max-w-sm w-full p-6">
-						<h3 className="text-xl font-semibold mb-2">Set as Primary Vessel?</h3>
-						<p className="text-slate-400 mb-6">
-							Are you sure you want to set <strong>{vessel.vessel_name}</strong> as your primary vessel?
-						</p>
-						<div className="flex gap-3 justify-end">
+				<div
+					style={{
+						position: 'fixed',
+						inset: 0,
+						zIndex: 1400,
+						background: 'rgba(0,0,0,0.6)',
+						display: 'flex',
+						alignItems: 'center',
+						justifyContent: 'center',
+						padding: 16,
+					}}
+				>
+					<div
+						style={{
+							width: '100%',
+							maxWidth: 520,
+							background: '#0f172a',
+							border: '1px solid #334155',
+							borderRadius: 12,
+							padding: 16,
+							color: '#e2e8f0',
+						}}
+					>
+						<div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+							<div>
+								<h3 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Set as Primary Vessel?</h3>
+								<p style={{ margin: '6px 0 0 0', color: '#94a3b8', fontSize: 13 }}>
+									Are you sure you want to set <strong>{vessel.vessel_name}</strong> as your primary vessel?
+								</p>
+							</div>
 							<button
 								type="button"
 								onClick={() => setShowConfirm(false)}
 								disabled={isLoading}
-								className="px-4 py-2 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-50"
+								style={{
+									border: '1px solid #334155',
+									background: 'transparent',
+									color: '#e2e8f0',
+									borderRadius: 8,
+									padding: '6px 10px',
+									cursor: isLoading ? 'not-allowed' : 'pointer',
+									opacity: isLoading ? 0.6 : 1,
+								}}
+							>
+								✕
+							</button>
+						</div>
+
+						<div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+							<button
+								type="button"
+								onClick={() => setShowConfirm(false)}
+								disabled={isLoading}
+								style={{
+									border: '1px solid #334155',
+									background: '#334155',
+									color: '#e2e8f0',
+									borderRadius: 10,
+									padding: '10px 12px',
+									cursor: isLoading ? 'not-allowed' : 'pointer',
+									opacity: isLoading ? 0.6 : 1,
+								}}
 							>
 								Cancel
 							</button>
@@ -98,7 +148,15 @@ const VesselCard = ({ vessel, onPrimarySet }) => {
 								type="button"
 								onClick={handleSetPrimary}
 								disabled={isLoading}
-								className="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50"
+								style={{
+									border: '1px solid #0ea5e9',
+									background: '#0284c7',
+									color: 'white',
+									borderRadius: 10,
+									padding: '10px 12px',
+									cursor: isLoading ? 'not-allowed' : 'pointer',
+									opacity: isLoading ? 0.6 : 1,
+								}}
 							>
 								{isLoading ? 'Setting...' : 'Yes, Set Primary'}
 							</button>

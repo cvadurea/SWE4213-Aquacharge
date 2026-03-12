@@ -233,7 +233,7 @@ const MyPort = ({ onNavigate, onLogout }) => {
         <div className="min-h-screen bg-slate-950 text-white flex">
             <SidebarPO onNavigate={onNavigate} onLogout={onLogout} />
 
-            <main className="flex-1 p-6">
+            <main className="flex-1 p-6" style={{ marginLeft: 175 }}>
                 <div className="max-w-7xl mx-auto">
                     <div className="flex justify-between items-center mb-8">
                         <div>

@@ -8,6 +8,7 @@ import MyVessels from './pages/MyVessels'
 import MyPort from './pages/MyPort'
 import FindChargers from './pages/FindChargers'
 import MyBookings from './pages/MyBookings'
+import PortBookings from './pages/PortBookings'
 
 function App() {
   const [isLogin, setIsLogin] = useState(true);
@@ -70,10 +71,12 @@ function App() {
                 <DashboardVO onLogout={onLogout} onNavigate={handleNavigate} />
               )
             ) : (
-              currentPage === 'dashboard' ? (
-                <DashboardPO onLogout={onLogout} onNavigate={handleNavigate} />
-              ) : (
+              currentPage === 'bookings' ? (
+                <PortBookings onNavigate={handleNavigate} onLogout={onLogout} />
+              ) : currentPage === 'my-port' ? (
                 <MyPort onNavigate={handleNavigate} onLogout={onLogout} />
+              ) : (
+                <DashboardPO onLogout={onLogout} onNavigate={handleNavigate} />
               )
             )
           ) : (

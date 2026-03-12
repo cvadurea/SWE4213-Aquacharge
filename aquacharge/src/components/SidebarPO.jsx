@@ -5,10 +5,8 @@ import List from '@mui/material/List';
 import Divider from '@mui/material/Divider';
 import ListItem from '@mui/material/ListItem';
 import ListItemButton from '@mui/material/ListItemButton';
-import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
-import InboxIcon from '@mui/icons-material/MoveToInbox';
-import MailIcon from '@mui/icons-material/Mail';
+
 
 const drawerWidth = 175;
 
@@ -16,6 +14,10 @@ export default function SidebarPO({ onNavigate, onLogout }) {
   const handleNavigation = (text) => {
     if (text === 'Dashboards' && onNavigate) {
       onNavigate('dashboard');
+    }
+
+    if (text === 'Bookings' && onNavigate) {
+      onNavigate('bookings');
     }
 
     if (text === 'My Port' && onNavigate) {

@@ -151,6 +151,49 @@ app.get('/bookings/user/:user_id', async (req, res) => {
     }
 });
 
+app.get('/bookings/port/:port_id', async (req, res) => {
+    const parsedPortId = parsePositiveInt(req.params.port_id);
+    if (!parsedPortId) {
+        return res.status(400).json({ message: 'Invalid port id.' });
+    }
+
+    const statusParam = String(req.query.status || 'active').toLowerCase();
+    const now = new Date();
+
+    const ACTIVE_STATUSES = ['pending', 'confirmed'];
+    const CANCELLED_STATUSES = ['cancelled'];
+
+    let statuses = ACTIVE_STATUSES;
+    if (statusParam === 'all') {
+        statuses = [...ACTIVE_STATUSES, ...CANCELLED_STATUSES];
+    } else if (statusParam === 'cancelled') {
+        statuses = CANCELLED_STATUSES;
+    } else if (statusParam === 'active') {
+        statuses = ACTIVE_STATUSES;
+    } else {
+        return res.status(400).json({ message: "Invalid status. Use 'active', 'cancelled', or 'all'." });
+    }
+
+    try {
+        const result = await pool.query(
+            `
+                SELECT *
+                FROM bookings
+                WHERE port_id = $1
+                  AND status = ANY($2)
+                  AND end_time > $3
+                ORDER BY start_time ASC
+            `,
+            [parsedPortId, statuses, now.toISOString()]
+        );
+
+        return res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching port bookings:', error);
+        return res.status(500).json({ message: 'Server error' });
+    }
+});
+
 app.get('/bookings/:id', async (req, res) => {
     const parsedBookingId = parsePositiveInt(req.params.id);
     if (!parsedBookingId) {

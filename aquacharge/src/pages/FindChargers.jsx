@@ -289,10 +289,9 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 							<h2 className="text-xl font-semibold mb-4">Available Chargers</h2>
 
 							<div className="mb-4 space-y-3 rounded-lg border border-slate-700 bg-slate-800 p-3">
-								<p className="text-sm font-semibold mb-3">Booking Vessel</p>
 								{primaryVessel ? (
 									<div className="bg-slate-900 border border-slate-600 rounded p-3">
-										<p className="font-semibold text-emerald-400">{primaryVessel.vessel_name}</p>
+										<p className="font-semibold text-emerald-400">Booking Vessel: {primaryVessel.vessel_name}</p>
 									</div>
 								) : (
 									<div className="bg-slate-900 border border-red-700 rounded p-3">

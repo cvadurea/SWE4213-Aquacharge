@@ -118,6 +118,37 @@ app.put('/vessels/:id', auth.auth, async (req, res) => {
     }
 });
 
+app.put('/vessels/:id/set-primary', auth.auth, async (req, res) => {
+    const { id } = req.params;
+    
+    try {
+        // First, get the vessel to find the owner_id
+        const vesselResult = await pool.query('SELECT owner_id FROM vessels WHERE id = $1', [id]);
+        if (vesselResult.rows.length === 0) {
+            return res.status(404).json({ message: 'Vessel not found' });
+        }
+
+        const owner_id = vesselResult.rows[0].owner_id;
+
+        // Set all other vessels for this owner to non-primary
+        await pool.query(
+            'UPDATE vessels SET is_primary = FALSE WHERE owner_id = $1 AND id != $2',
+            [owner_id, id]
+        );
+
+        // Set this vessel to primary
+        const result = await pool.query(
+            'UPDATE vessels SET is_primary = TRUE WHERE id = $1 RETURNING *',
+            [id]
+        );
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Error setting primary vessel:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 app.delete('/vessels/:id', auth.auth, async (req, res) => {
     const { id } = req.params;
     try {

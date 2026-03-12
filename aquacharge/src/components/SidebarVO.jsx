@@ -10,7 +10,7 @@ import ListItemText from '@mui/material/ListItemText';
 import InboxIcon from '@mui/icons-material/MoveToInbox';
 import MailIcon from '@mui/icons-material/Mail';
 
-const drawerWidth = 250;
+const drawerWidth = 175;
 
 export default function SidebarVO({ onNavigate, onLogout }) {
   const handleNavigation = (text) => {

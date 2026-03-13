@@ -62,7 +62,7 @@ const DashboardPO = ({ onLogout, onNavigate }) => {
     event.preventDefault();
     const parsed = Number(newPrice);
     if (!Number.isFinite(parsed) || parsed <= 0) {
-      setError('Price per kWh must be a positive number.');
+      setError('Price per kW must be a positive number.');
       return;
     }
 
@@ -110,7 +110,7 @@ const DashboardPO = ({ onLogout, onNavigate }) => {
             <div className="rounded-lg border border-slate-700 bg-slate-900 p-4">
               <p className="text-sm text-slate-400">Current V2G Discharge Price</p>
               <p className="mt-2 text-3xl font-semibold">
-                {pricePerKwh != null ? `$${pricePerKwh.toFixed(2)} / kWh` : '—'}
+                {pricePerKwh != null ? `$${pricePerKwh.toFixed(2)} / kW` : '—'}
               </p>
             </div>
 
@@ -126,7 +126,7 @@ const DashboardPO = ({ onLogout, onNavigate }) => {
                   className="w-full sm:w-32 p-2 rounded bg-slate-800 border border-slate-700"
                   placeholder="0.20"
                 />
-                <span className="text-sm text-slate-400">USD / kWh</span>
+                <span className="text-sm text-slate-400">USD / kW</span>
                 <button
                   type="submit"
                   disabled={isSaving}

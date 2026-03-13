@@ -318,7 +318,7 @@ const MyVessels = ({ onNavigate, onLogout }) => {
                 onChange={onInputChange}
                 type="number"
                 min="1"
-                placeholder="Battery Capacity (kWh)"
+                placeholder="Battery Capacity (kW)"
                 className="w-full p-2 rounded bg-slate-800 border border-slate-700"
                 required
               />

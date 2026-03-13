@@ -270,36 +270,95 @@ const MyPort = ({ onNavigate, onLogout }) => {
 
                     {error && <p className="text-red-400 mb-4">{error}</p>}
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        <button
-                            type="button"
-                            onClick={() => setIsModalOpen(true)}
-                            className="aspect-square rounded-lg border-2 border-dashed border-slate-600 hover:border-emerald-500 bg-slate-900 hover:bg-slate-800 transition flex flex-col items-center justify-center"
-                        >
-                            <span className="text-5xl leading-none">+</span>
-                            <span className="mt-2 font-medium">Add Charger</span>
-                        </button>
+                    <div
+                        style={{
+                            display: 'flex',
+                            flexDirection: 'row',
+                            flexWrap: 'wrap',
+                            gap: 24,
+                            alignItems: 'stretch',
+                        }}
+                    >
+                        <div style={{ width: 192, flexShrink: 0 }}>
+                            <button
+                                type="button"
+                                onClick={() => setIsModalOpen(true)}
+                                className="aspect-square rounded-lg border-2 border-dashed border-slate-600 hover:border-emerald-500 bg-slate-900 hover:bg-slate-800 transition flex flex-col items-center justify-center"
+                                style={{ width: 192, height: 192 }}
+                            >
+                                <span className="text-5xl leading-none">+</span>
+                                <span className="mt-2 font-medium">Add Charger</span>
+                            </button>
+                        </div>
 
                         {chargers.map((charger) => (
-                            <ChargerCard key={charger.id} charger={charger} />
+                            <div key={charger.id} style={{ width: 192, flexShrink: 0 }}>
+                                <ChargerCard charger={charger} />
+                            </div>
                         ))}
                     </div>
                 </div>
             </main>
 
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-                    <div className="w-full max-w-lg bg-slate-900 rounded-lg p-6 border border-slate-700">
-                        <h2 className="text-2xl font-semibold mb-4">Add Charger</h2>
+                <div
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        zIndex: 1400,
+                        background: 'rgba(0,0,0,0.6)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: 16,
+                    }}
+                >
+                    <div
+                        style={{
+                            width: '100%',
+                            maxWidth: 520,
+                            background: '#0f172a',
+                            border: '1px solid #334155',
+                            borderRadius: 12,
+                            padding: 16,
+                            color: '#e2e8f0',
+                        }}
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+                            <h2 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Add Charger</h2>
+                            <button
+                                type="button"
+                                onClick={closeModal}
+                                style={{
+                                    border: '1px solid #334155',
+                                    background: 'transparent',
+                                    color: '#e2e8f0',
+                                    borderRadius: 8,
+                                    padding: '6px 10px',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                ✕
+                            </button>
+                        </div>
 
-                        <form onSubmit={createCharger} className="space-y-4">
+                        <form onSubmit={createCharger} style={{ marginTop: 14, display: 'grid', gap: 12 }}>
                             <div>
-                                <label className="block text-sm text-slate-300 mb-2">Charger Type</label>
+                                <label style={{ display: 'block', fontSize: 13, color: '#cbd5e1', marginBottom: 8 }}>
+                                    Charger Type
+                                </label>
                                 <select
                                     name="type"
                                     value={formData.type}
                                     onChange={onInputChange}
-                                    className="w-full p-2 rounded bg-slate-800 border border-slate-700"
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px 12px',
+                                        borderRadius: 10,
+                                        border: '1px solid #334155',
+                                        background: '#020617',
+                                        color: '#e2e8f0',
+                                    }}
                                     required
                                 >
                                     <option value="">Select Type</option>
@@ -308,7 +367,7 @@ const MyPort = ({ onNavigate, onLogout }) => {
                                 </select>
                             </div>
 
-                            <label className="flex items-center gap-2 text-sm text-slate-300">
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#cbd5e1' }}>
                                 <input
                                     type="checkbox"
                                     name="is_available"
@@ -318,19 +377,35 @@ const MyPort = ({ onNavigate, onLogout }) => {
                                 Available for booking
                             </label>
 
-                            <div className="flex justify-end gap-3 pt-2">
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 6 }}>
                                 <button
                                     type="button"
                                     onClick={closeModal}
-                                    className="px-4 py-2 rounded bg-slate-700 hover:bg-slate-600"
                                     disabled={isSubmitting}
+                                    style={{
+                                        border: '1px solid #334155',
+                                        background: '#334155',
+                                        color: '#e2e8f0',
+                                        borderRadius: 10,
+                                        padding: '10px 12px',
+                                        cursor: 'pointer',
+                                        opacity: isSubmitting ? 0.7 : 1,
+                                    }}
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700"
                                     disabled={isSubmitting}
+                                    style={{
+                                        border: '1px solid #059669',
+                                        background: '#059669',
+                                        color: 'white',
+                                        borderRadius: 10,
+                                        padding: '10px 12px',
+                                        cursor: 'pointer',
+                                        opacity: isSubmitting ? 0.7 : 1,
+                                    }}
                                 >
                                     {isSubmitting ? 'Adding...' : 'Add Charger'}
                                 </button>

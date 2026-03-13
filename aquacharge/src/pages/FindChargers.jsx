@@ -166,23 +166,31 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 		const user = getStoredUser();
 
 		if (!user?.id) {
-			setError('Missing user information. Please log in again.');
-			return;
+			const message = 'Missing user information. Please log in again.';
+			setError(message);
+			alert(message);
+			return false;
 		}
 
 		if (!selectedPort?.id) {
-			setError('Please select a port first.');
-			return;
+			const message = 'Please select a port first.';
+			setError(message);
+			alert(message);
+			return false;
 		}
 
 		if (!primaryVessel?.id) {
-			setError('No primary vessel set. Please set a primary vessel in My Vessels before booking.');
-			return;
+			const message = 'No primary vessel set. Please set a primary vessel in My Vessels before booking.';
+			setError(message);
+			alert(message);
+			return false;
 		}
 
 		if (!timeslot?.start || !timeslot?.end) {
-			setError('Invalid timeslot selected.');
-			return;
+			const message = 'Invalid timeslot selected.';
+			setError(message);
+			alert(message);
+			return false;
 		}
 
 		try {
@@ -209,13 +217,15 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 
 			const data = await parseResponseBody(response);
 			if (!response.ok) {
-				setError(data.message || `Failed to create booking (HTTP ${response.status}).`);
-				return;
+				const message = data.message || `Failed to create booking (HTTP ${response.status}).`;
+				setError(message);
+				alert(message);
+				return false;
 			}
 
 			if (data?.v2g_transaction) {
 				setBookingStatus(
-					`Booking confirmed (V2G) for charger #${charger.id} using ${primaryVessel.vessel_name}. Discharge: ${data.v2g_transaction.energy_discharged} kWh.`
+					`Booking confirmed (V2G) for charger #${charger.id} using ${primaryVessel.vessel_name}. Discharge: ${data.v2g_transaction.energy_discharged} kW.`
 				);
 			} else {
 				setBookingStatus(`Booking confirmed for charger #${charger.id} using ${primaryVessel.vessel_name}.`);
@@ -224,9 +234,13 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 			setSelectedCharger(null);
 			setPendingTimeslot(null);
 			setShowBookingTypeModal(false);
+			return true;
 		} catch (err) {
 			console.error('Error creating booking:', err);
-			setError('Could not connect to booking service.');
+			const message = 'Could not connect to booking service.';
+			setError(message);
+			alert(message);
+			return false;
 		} finally {
 			setBookingLoadingChargerId(null);
 		}
@@ -238,7 +252,7 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 		setError('');
 	};
 
-	const handleTimeslotSelect = (timeslot) => {
+	const handleTimeslotSelect = async (timeslot) => {
 		if (selectedCharger && timeslot) {
 			if (String(selectedCharger.type || '').toLowerCase() === 'bidirectional') {
 				setPendingTimeslot(timeslot);
@@ -248,7 +262,7 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 				return;
 			}
 
-			createBooking(selectedCharger, timeslot, { booking_type: 'regular' });
+			await createBooking(selectedCharger, timeslot, { booking_type: 'regular' });
 		}
 	};
 
@@ -264,7 +278,7 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 		if (bookingType === 'bidirectional') {
 			const parsed = Number(dischargeKwh);
 			if (!Number.isFinite(parsed) || parsed <= 0) {
-				setError('Please enter a valid kWh discharge amount.');
+				setError('Please enter a valid kW discharge amount.');
 				return;
 			}
 			createBooking(selectedCharger, pendingTimeslot, {
@@ -471,7 +485,7 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 						{bookingType === 'bidirectional' && (
 							<div style={{ marginTop: 14 }}>
 								<label style={{ display: 'block', fontSize: 13, color: '#cbd5e1', marginBottom: 8 }}>
-									Energy to discharge to the grid (kWh)
+									Energy to discharge to the grid (kW)
 								</label>
 								<input
 									type="number"
@@ -490,7 +504,7 @@ const FindChargers = ({ onNavigate, onLogout }) => {
 									placeholder="e.g. 10"
 								/>
 								<p style={{ margin: '8px 0 0 0', color: '#94a3b8', fontSize: 12 }}>
-									Your transaction will record price/kWh and total payment.
+									Your transaction will record price/kW and total payment.
 								</p>
 							</div>
 						)}

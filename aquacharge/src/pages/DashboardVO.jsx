@@ -142,7 +142,7 @@ const DashboardVO = ({ onLogout, onNavigate }) => {
             <div className="rounded-lg border border-slate-700 bg-slate-900 p-4">
               <p className="text-sm text-slate-400">Current V2G Price</p>
               <p className="mt-2 text-3xl font-semibold">
-                {pricePerKwh != null ? `$${pricePerKwh.toFixed(2)} / kWh` : '—'}
+                {pricePerKwh != null ? `$${pricePerKwh.toFixed(2)} / kW` : '—'}
               </p>
             </div>
             <div className="rounded-lg border border-slate-700 bg-slate-900 p-4">
@@ -177,8 +177,8 @@ const DashboardVO = ({ onLogout, onNavigate }) => {
                     </p>
                     {b.type === 'bidirectional' && b.v2g_transaction && (
                       <p className="text-emerald-400 mt-1">
-                        V2G • {b.v2g_transaction.energy_discharged} kWh @ $
-                        {Number(b.v2g_transaction.price_per_kwh).toFixed(2)}/kWh
+                        V2G • {b.v2g_transaction.energy_discharged} kW @ $
+                        {Number(b.v2g_transaction.price_per_kwh).toFixed(2)}/kW
                       </p>
                     )}
                   </div>

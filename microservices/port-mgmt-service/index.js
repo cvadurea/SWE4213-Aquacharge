@@ -4,7 +4,6 @@ const auth = require('./middleware/auth.js');
 
 const app = express();
 
-// CORS middleware
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -81,6 +80,19 @@ const initChargerDB = async () => {
         console.log('Chargers table initialized');
     } catch (error) {
         console.error('Error initializing database:', error);
+    }
+
+    try{
+        await poolCharger.query(`
+            INSERT INTO chargers (port_id, type, is_available) VALUES 
+            (1, 'regular', true),
+            (1, 'bidirectional', true)
+            ON CONFLICT (id) DO NOTHING;
+        `);
+        console.log('Sample chargers data inserted');
+    }
+    catch (error) {
+        console.error('Error inserting sample chargers data:', error);
     }
 };
 

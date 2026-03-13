@@ -126,9 +126,18 @@ const MyBookings = ({ onNavigate, onLogout }) => {
                     ) : bookings.length === 0 ? (
                         <p className="text-slate-300">No bookings found.</p>
                     ) : (
-                        <div className="space-y-4">
+                        <div
+                            style={{
+                                display: 'flex',
+                                flexDirection: 'row',
+                                flexWrap: 'wrap',
+                                gap: 24,
+                                alignItems: 'stretch',
+                            }}
+                        >
                             {bookings.map((booking) => (
-                                <div key={booking.id} className="rounded-lg border border-slate-700 bg-slate-900 p-4">
+                                <div key={booking.id} style={{ width: 192, flexShrink: 0 }}>
+                                    <div className="rounded-lg border border-slate-700 bg-slate-900 p-4">
                                     <p className="font-semibold text-lg">Booking #{booking.id}</p>
                                     <p className="text-sm text-slate-300 mt-1">Port: {booking.port_id} • Charger: {booking.charger_id}</p>
                                     <p className="text-sm text-slate-300">Vessel: {booking.vessel_id}</p>
@@ -147,8 +156,8 @@ const MyBookings = ({ onNavigate, onLogout }) => {
                                             <p className="text-sm font-semibold text-slate-200">V2G Transaction</p>
                                             {booking.v2g_transaction ? (
                                                 <div className="mt-2 space-y-1 text-sm text-slate-300">
-                                                    <p>Price per kWh: {booking.v2g_transaction.price_per_kwh}</p>
-                                                    <p>Energy discharged (kWh): {booking.v2g_transaction.energy_discharged}</p>
+                                                    <p>Price per kW: {booking.v2g_transaction.price_per_kwh}</p>
+                                                    <p>Energy discharged (kW): {booking.v2g_transaction.energy_discharged}</p>
                                                     <p>Total payment: {booking.v2g_transaction.payment}</p>
                                                 </div>
                                             ) : (
@@ -183,6 +192,7 @@ const MyBookings = ({ onNavigate, onLogout }) => {
                                             {isCancellingId === booking.id ? 'Cancelling...' : 'Cancel Booking'}
                                         </button>
                                     )}
+                                    </div>
                                 </div>
                             ))}
                         </div>

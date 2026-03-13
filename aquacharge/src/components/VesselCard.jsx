@@ -55,7 +55,7 @@ const VesselCard = ({ vessel, onPrimarySet }) => {
 					<h3 className="text-xl font-semibold mb-2 break-words">{vessel.vessel_name}</h3>
 					<p className="text-sm text-slate-300">Model: {vessel.vessel_model}</p>
 					<p className="text-sm text-slate-300">Reg #: {vessel.registration_number}</p>
-					<p className="text-sm text-slate-300">Battery: {vessel.battery_capacity} kWh</p>
+					<p className="text-sm text-slate-300">Battery: {vessel.battery_capacity} kW</p>
 				</div>
 
 				<div className="space-y-2">

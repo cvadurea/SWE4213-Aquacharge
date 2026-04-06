@@ -26,6 +26,10 @@ export default function SidebarVO({ onNavigate, onLogout }) {
     if (text === 'My Vessels' && onNavigate) {
       onNavigate('my-vessels');
     }
+
+    if (text === 'Profile' && onNavigate) {
+      onNavigate('profile');
+    }
   };
 
   const list = (
@@ -54,11 +58,13 @@ export default function SidebarVO({ onNavigate, onLogout }) {
           <ListItem key={text} disablePadding>
             <ListItemButton
               sx={text === 'Logout' ? { color: 'error.main' } : {}}
-              onClick={text === 'Logout' ? () => {
-                if (onLogout) {
+              onClick={() => {
+                if (text === 'Logout' && onLogout) {
                   onLogout();
+                } else if (text === 'Profile') {
+                  handleNavigation('Profile');
                 }
-              } : undefined}
+              }}
             >
               <ListItemText
                 primary={text}

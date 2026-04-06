@@ -5,6 +5,18 @@ const bcrypt = require('bcrypt');
 const app = express();
 app.use(express.json());
 
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', process.env.CORS_ORIGIN || 'http://localhost:5173');
+    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(204);
+    }
+
+    next();
+});
+
 const PORT = 3007;
 
 const pool = new Pool({
@@ -24,7 +36,8 @@ const initDB = async () => {
                 password_hash VARCHAR(255) NOT NULL,
                 first_name VARCHAR(255) NOT NULL,
                 last_name VARCHAR(255) NOT NULL,
-                type VARCHAR(50) NOT NULL
+                type VARCHAR(50) NOT NULL,
+                avatar_url TEXT
             );
         `);
     } catch (error) {
@@ -93,12 +106,12 @@ app.get('/users/:id', async (req, res) => {
 
 app.put('/users/:id', async (req, res) => {
   const { id } = req.params;
-  const { email, first_name, last_name, type } = req.body;
+  const { email, first_name, last_name, type, avatar_url } = req.body;
 
   try {
     const result = await pool.query(
-      'UPDATE users SET email = $1, first_name = $2, last_name = $3 WHERE id = $4 RETURNING *',
-      [email, first_name, last_name, id]
+      'UPDATE users SET email = $1, first_name = $2, last_name = $3, avatar_url = $4 WHERE id = $5 RETURNING *',
+      [email, first_name, last_name, avatar_url, id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });

@@ -56,7 +56,8 @@ app.post('/login', async (req, res) => {
                 email: user.email, 
                 first_name: user.first_name,
                 last_name: user.last_name,
-                type: user.type
+                type: user.type,
+                avatar_url: user.avatar_url
             }, 
             token,
         });
@@ -88,7 +89,14 @@ app.post('/register', async (req, res) => {
         const token = jwt.sign({ userId: user.rows[0].id, email: user.rows[0].email }, process.env.JWT_SECRET, { expiresIn: '1h' });
         res.status(201).json({ 
             message: 'User registered successfully', 
-            user: user.rows[0], 
+            user: {
+                id: user.rows[0].id,
+                email: user.rows[0].email,
+                first_name: user.rows[0].first_name,
+                last_name: user.rows[0].last_name,
+                type: user.rows[0].type,
+                avatar_url: user.rows[0].avatar_url
+            }, 
             token,
         });
     } catch (error) {

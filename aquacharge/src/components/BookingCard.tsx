@@ -15,6 +15,7 @@ interface BookingCardProps {
     energyDischarged: number;
     pricePerKwh: number;
   };
+  footerAction?: React.ReactNode;
 }
 
 export default function BookingCard({
@@ -24,6 +25,7 @@ export default function BookingCard({
   endTime,
   status = 'confirmed',
   v2gInfo,
+  footerAction,
 }: BookingCardProps) {
   const statusVariant = {
     confirmed: 'secondary' as const,
@@ -71,6 +73,12 @@ export default function BookingCard({
                 V2G: {v2gInfo.energyDischarged} kW @ ${v2gInfo.pricePerKwh.toFixed(2)}/kW
               </span>
             </div>
+          </div>
+        )}
+
+        {footerAction && (
+          <div className="pt-2 border-t border-border">
+            {footerAction}
           </div>
         )}
       </CardContent>

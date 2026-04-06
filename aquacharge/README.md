@@ -26,7 +26,7 @@ npm run dev
 pnpm dev
 ```
 
-The application will be available at `http://localhost:3000`
+The application will be available at `http://localhost:5173`
 
 ### Build for Production
 
@@ -109,7 +109,7 @@ aquacharge/
 
 ```bash
 # Development
-npm run dev              # Start dev server on http://localhost:3000
+npm run dev              # Start dev server on http://localhost:5173
 
 # Build
 npm run build            # Build for production

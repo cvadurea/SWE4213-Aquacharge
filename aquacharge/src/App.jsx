@@ -9,7 +9,7 @@ import MyPort from './pages/MyPort'
 import FindChargers from './pages/FindChargers'
 import MyBookings from './pages/MyBookings'
 import PortBookings from './pages/PortBookings'
-import ProfileVO from './pages/ProfileVO'
+import Profile from './pages/Profile'
 
 function App() {
   const [isLogin, setIsLogin] = useState(true);
@@ -69,7 +69,7 @@ function App() {
               ) : currentPage === 'find-chargers' ? (
                 <FindChargers onNavigate={handleNavigate} onLogout={onLogout} />
               ) : currentPage === 'profile' ? (
-                <ProfileVO onNavigate={handleNavigate} onLogout={onLogout} />
+                <Profile onNavigate={handleNavigate} onLogout={onLogout} />
               ) : (
                 <DashboardVO onLogout={onLogout} onNavigate={handleNavigate} />
               )
@@ -78,6 +78,8 @@ function App() {
                 <PortBookings onNavigate={handleNavigate} onLogout={onLogout} />
               ) : currentPage === 'my-port' ? (
                 <MyPort onNavigate={handleNavigate} onLogout={onLogout} />
+              ) : currentPage === 'profile' ? (
+                <Profile onNavigate={handleNavigate} onLogout={onLogout} />
               ) : (
                 <DashboardPO onLogout={onLogout} onNavigate={handleNavigate} />
               )

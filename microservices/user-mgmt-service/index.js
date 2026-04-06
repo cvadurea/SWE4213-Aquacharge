@@ -124,13 +124,27 @@ app.put('/users/:id', async (req, res) => {
 });
 
 app.delete('/users/:id', async (req, res) => {
-    const { id } = req.params;    
+    const { id } = req.params;
+    const { password } = req.body;
+
+    if (!password) {
+        return res.status(400).json({ error: 'Password is required to delete account' });
+    }
+
     try {
-        const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING *', [id]);
-        if (result.rows.length === 0) {
+        const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+        if (userResult.rows.length === 0) {
             return res.status(404).json({ error: 'User not found' });
         }
-        res.json({ message: 'User deleted successfully' });
+
+        const user = userResult.rows[0];
+        const isMatch = await bcrypt.compare(password, user.password_hash);
+        if (!isMatch) {
+            return res.status(401).json({ error: 'Invalid password' });
+        }
+
+        const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING *', [id]);
+        res.json({ message: 'Account deleted successfully' });
     } catch (err) {
         console.error('Error deleting user:', err);
         res.status(500).json({ error: 'Internal server error' });

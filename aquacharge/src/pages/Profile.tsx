@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
+import { getPONavigation, getVONavigation } from '@/lib/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -129,14 +130,9 @@ export default function Profile({ onLogout, onNavigate }: ProfileProps) {
     }
   };
 
-  const navigation = [
-    { label: 'Dashboard', id: 'dashboard' },
-    { label: 'Bookings', id: 'bookings' },
-    { label: 'My Port', id: 'my-port' },
-    { label: 'Profile', id: 'profile' },
-  ];
-
   const userType = user?.type === 'port_operator' ? 'port_operator' : 'vessel_owner';
+
+  const navigation = userType === 'port_operator' ? getPONavigation() : getVONavigation();
 
   if (!user) {
     return (

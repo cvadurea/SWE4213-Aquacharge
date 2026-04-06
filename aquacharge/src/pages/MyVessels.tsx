@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
+import { getVONavigation } from '@/lib/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -185,13 +186,7 @@ export default function MyVessels({ onNavigate, onLogout }: MyVesselsProps) {
     getVessels();
   }, []);
 
-  const navigation = [
-    { label: 'Dashboard', id: 'dashboard', icon: <Ship className="h-4 w-4" /> },
-    { label: 'Find Chargers', id: 'find-chargers', icon: <Ship className="h-4 w-4" /> },
-    { label: 'My Bookings', id: 'my-bookings', icon: <Ship className="h-4 w-4" /> },
-    { label: 'My Vessels', id: 'my-vessels', icon: <Ship className="h-4 w-4" /> },
-    { label: 'Profile', id: 'profile', icon: <Ship className="h-4 w-4" /> },
-  ];
+  const navigation = getVONavigation();
 
   return (
     <DashboardLayout

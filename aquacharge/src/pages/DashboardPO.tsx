@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import MetricCard from '@/components/MetricCard';
+import { getPONavigation } from '@/lib/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -101,12 +102,7 @@ export default function DashboardPO({ onLogout, onNavigate }: DashboardPOProps) 
     }
   };
 
-  const navigation = [
-    { label: 'Dashboard', id: 'dashboard', icon: <Zap className="h-4 w-4" /> },
-    { label: 'Bookings', id: 'bookings', icon: <Zap className="h-4 w-4" /> },
-    { label: 'My Port', id: 'my-port', icon: <Zap className="h-4 w-4" /> },
-    { label: 'Profile', id: 'profile', icon: <Zap className="h-4 w-4" /> },
-  ];
+  const navigation = getPONavigation();
 
   return (
     <DashboardLayout

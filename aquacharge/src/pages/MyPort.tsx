@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
+import { getPONavigation } from '@/lib/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, Plus, PlugZap } from 'lucide-react';
@@ -62,12 +63,7 @@ export default function MyPort({ onLogout, onNavigate }: MyPortProps) {
     loadPort();
   }, []);
 
-  const navigation = [
-    { label: 'Dashboard', id: 'dashboard' },
-    { label: 'Bookings', id: 'bookings' },
-    { label: 'My Port', id: 'my-port' },
-    { label: 'Profile', id: 'profile' },
-  ];
+  const navigation = getPONavigation();
 
   return (
     <DashboardLayout

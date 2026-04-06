@@ -6,6 +6,9 @@ import DashboardPO from './pages/DashboardPO'
 import FindChargers from './pages/FindChargers'
 import MyVessels from './pages/MyVessels'
 import MyBookings from './pages/MyBookings'
+import PortBookings from './pages/PortBookings'
+import MyPort from './pages/MyPort'
+import Profile from './pages/Profile'
 
 function App() {
   const [isLogin, setIsLogin] = useState(true);
@@ -69,11 +72,22 @@ function App() {
           return <MyVessels onLogout={onLogout} onNavigate={handleNavigate} />;
         case 'my-bookings':
           return <MyBookings onLogout={onLogout} onNavigate={handleNavigate} />;
+        case 'profile':
+          return <Profile onLogout={onLogout} onNavigate={handleNavigate} />;
         default:
           return <DashboardVO onLogout={onLogout} onNavigate={handleNavigate} />;
       }
     } else {
-      return <DashboardPO onLogout={onLogout} onNavigate={handleNavigate} />;
+      switch (currentPage) {
+        case 'bookings':
+          return <PortBookings onLogout={onLogout} onNavigate={handleNavigate} />;
+        case 'my-port':
+          return <MyPort onLogout={onLogout} onNavigate={handleNavigate} />;
+        case 'profile':
+          return <Profile onLogout={onLogout} onNavigate={handleNavigate} />;
+        default:
+          return <DashboardPO onLogout={onLogout} onNavigate={handleNavigate} />;
+      }
     }
   };
 

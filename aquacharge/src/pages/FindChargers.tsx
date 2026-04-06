@@ -34,6 +34,10 @@ interface Timeslot {
   end: string;
 }
 
+interface AvailabilityTimeslot extends Timeslot {
+  available: boolean;
+}
+
 interface FindChargersProps {
   onNavigate: (page: string) => void;
   onLogout: () => void;
@@ -48,6 +52,11 @@ export default function FindChargers({ onNavigate, onLogout }: FindChargersProps
   const [selectedCharger, setSelectedCharger] = useState<Charger | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
   const [pendingTimeslot, setPendingTimeslot] = useState<Timeslot | null>(null);
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [timeslots, setTimeslots] = useState<AvailabilityTimeslot[]>([]);
+  const [isTimeslotsLoading, setIsTimeslotsLoading] = useState(false);
+  const [selectedStartSlot, setSelectedStartSlot] = useState<AvailabilityTimeslot | null>(null);
+  const [selectedEndSlot, setSelectedEndSlot] = useState<AvailabilityTimeslot | null>(null);
   const [showBookingTypeModal, setShowBookingTypeModal] = useState(false);
   const [bookingType, setBookingType] = useState('regular');
   const [dischargeKwh, setDischargeKwh] = useState('');
@@ -259,6 +268,8 @@ export default function FindChargers({ onNavigate, onLogout }: FindChargersProps
 
   const handleChargerClick = (charger: Charger) => {
     setSelectedCharger(charger);
+    setSelectedStartSlot(null);
+    setSelectedEndSlot(null);
     setShowCalendar(true);
   };
 
@@ -281,6 +292,138 @@ export default function FindChargers({ onNavigate, onLogout }: FindChargersProps
     getPorts();
     getVessels();
   }, []);
+
+  const toDayRange = (dateString: string) => {
+    const start = new Date(`${dateString}T00:00:00`);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    return { start, end };
+  };
+
+  const loadTimeslots = async (chargerId: string, dateString: string) => {
+    try {
+      setIsTimeslotsLoading(true);
+      setError('');
+
+      const { start, end } = toDayRange(dateString);
+      const params = new URLSearchParams({
+        start_date: start.toISOString(),
+        end_date: end.toISOString(),
+      });
+
+      const response = await fetch(`${BOOKING_API_BASE}/chargers/${encodeURIComponent(chargerId)}/timeslots?${params.toString()}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const data = await parseResponseBody(response);
+
+      if (!response.ok) {
+        setError(data.message || `Failed to fetch timeslots (HTTP ${response.status}).`);
+        setTimeslots([]);
+        return;
+      }
+
+      const now = new Date();
+      const nextSlots: AvailabilityTimeslot[] = (Array.isArray(data?.timeslots) ? data.timeslots : [])
+        .filter((slot: AvailabilityTimeslot) => new Date(slot.end) > now)
+        .map((slot: AvailabilityTimeslot) => ({
+          start: slot.start,
+          end: slot.end,
+          available: Boolean(slot.available),
+        }));
+
+      setTimeslots(nextSlots);
+    } catch (err) {
+      console.error('Error loading timeslots:', err);
+      setError('Could not connect to booking service for timeslot availability.');
+      setTimeslots([]);
+    } finally {
+      setIsTimeslotsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (showCalendar && selectedCharger?.id) {
+      loadTimeslots(selectedCharger.id, selectedDate);
+    }
+  }, [showCalendar, selectedCharger?.id, selectedDate]);
+
+  const formatSlotTime = (iso: string) => {
+    const date = new Date(iso);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const getSlotIndex = (slot: AvailabilityTimeslot | null) => {
+    if (!slot) return -1;
+    return timeslots.findIndex((item) => item.start === slot.start && item.end === slot.end);
+  };
+
+  const isInSelectedRange = (slot: AvailabilityTimeslot) => {
+    const startIndex = getSlotIndex(selectedStartSlot);
+    const endIndex = getSlotIndex(selectedEndSlot || selectedStartSlot);
+    const idx = getSlotIndex(slot);
+    if (startIndex < 0 || endIndex < 0 || idx < 0) return false;
+    return idx >= Math.min(startIndex, endIndex) && idx <= Math.max(startIndex, endIndex);
+  };
+
+  const handleSlotClick = (slot: AvailabilityTimeslot) => {
+    if (!slot.available) return;
+
+    if (!selectedStartSlot || (selectedStartSlot && selectedEndSlot)) {
+      setSelectedStartSlot(slot);
+      setSelectedEndSlot(null);
+      return;
+    }
+
+    const startIndex = getSlotIndex(selectedStartSlot);
+    const endIndex = getSlotIndex(slot);
+
+    if (startIndex < 0 || endIndex < 0) {
+      setSelectedStartSlot(slot);
+      setSelectedEndSlot(null);
+      return;
+    }
+
+    if (endIndex < startIndex) {
+      setSelectedStartSlot(slot);
+      setSelectedEndSlot(null);
+      return;
+    }
+
+    const range = timeslots.slice(startIndex, endIndex + 1);
+    const hasUnavailable = range.some((item) => !item.available);
+    if (hasUnavailable) {
+      setError('Selected range includes unavailable timeslots.');
+      return;
+    }
+
+    const selectedStart = new Date(selectedStartSlot.start).getTime();
+    const selectedEnd = new Date(slot.end).getTime();
+    const hours = (selectedEnd - selectedStart) / (1000 * 60 * 60);
+    if (hours > 4) {
+      setError('Maximum booking duration is 4 hours.');
+      return;
+    }
+
+    setError('');
+    setSelectedEndSlot(slot);
+  };
+
+  const continueWithTimeslot = () => {
+    if (!selectedStartSlot) {
+      setError('Please choose at least a start timeslot.');
+      return;
+    }
+
+    const finalEnd = selectedEndSlot || selectedStartSlot;
+    setPendingTimeslot({
+      start: selectedStartSlot.start,
+      end: finalEnd.end,
+    });
+    setShowCalendar(false);
+    setShowBookingTypeModal(true);
+  };
 
   const navigation = [
     { label: 'Dashboard', id: 'dashboard', icon: <Zap className="h-4 w-4" /> },
@@ -424,31 +567,81 @@ export default function FindChargers({ onNavigate, onLogout }: FindChargersProps
               <CardDescription>Choose when you want to book charger #{selectedCharger.id}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="p-4 rounded-lg bg-muted/50">
-                <p className="text-sm text-muted-foreground mb-2">Charger Type</p>
-                <p className="font-semibold text-foreground">{selectedCharger.type}</p>
+              <div className="p-4 rounded-lg bg-muted/50 space-y-3">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Charger Type</p>
+                  <p className="font-semibold text-foreground">{selectedCharger.type}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Booking Date</p>
+                  <Input
+                    type="date"
+                    value={selectedDate}
+                    min={new Date().toISOString().slice(0, 10)}
+                    onChange={(e) => {
+                      setSelectedDate(e.target.value);
+                      setSelectedStartSlot(null);
+                      setSelectedEndSlot(null);
+                    }}
+                  />
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground">
-                Calendar integration coming soon. Please contact support to book a timeslot.
-              </p>
+
+              {isTimeslotsLoading ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="h-5 w-5 text-secondary animate-spin mr-2" />
+                  <p className="text-sm text-muted-foreground">Loading availability...</p>
+                </div>
+              ) : timeslots.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No available timeslots for this day.</p>
+              ) : (
+                <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1">
+                  {timeslots.map((slot) => {
+                    const selected = isInSelectedRange(slot);
+                    return (
+                      <button
+                        type="button"
+                        key={`${slot.start}-${slot.end}`}
+                        disabled={!slot.available}
+                        onClick={() => handleSlotClick(slot)}
+                        className={`rounded-md border px-2 py-2 text-xs font-medium transition-colors ${
+                          slot.available
+                            ? selected
+                              ? 'border-secondary bg-secondary/15 text-secondary'
+                              : 'border-border hover:border-secondary/60 hover:bg-muted'
+                            : 'border-border bg-muted/40 text-muted-foreground/60 cursor-not-allowed'
+                        }`}
+                      >
+                        {formatSlotTime(slot.start)}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {selectedStartSlot && (
+                <div className="rounded-lg border border-border p-3 text-sm text-muted-foreground">
+                  Selected: {formatSlotTime(selectedStartSlot.start)} -{' '}
+                  {formatSlotTime((selectedEndSlot || selectedStartSlot).end)}
+                </div>
+              )}
+
               <div className="flex gap-3">
                 <Button
                   variant="outline"
                   className="flex-1"
-                  onClick={() => setShowCalendar(false)}
+                  onClick={() => {
+                    setShowCalendar(false);
+                    setSelectedStartSlot(null);
+                    setSelectedEndSlot(null);
+                  }}
                 >
                   Cancel
                 </Button>
                 <Button
                   className="flex-1"
-                  onClick={() => {
-                    setPendingTimeslot({
-                      start: new Date().toISOString(),
-                      end: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
-                    });
-                    setShowCalendar(false);
-                    setShowBookingTypeModal(true);
-                  }}
+                  disabled={!selectedStartSlot}
+                  onClick={continueWithTimeslot}
                 >
                   Continue
                 </Button>

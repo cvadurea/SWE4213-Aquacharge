@@ -3,7 +3,7 @@ import DashboardLayout from '@/components/DashboardLayout';
 import BookingCard from '@/components/BookingCard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, Calendar, Zap, Loader2, Filter } from 'lucide-react';
+import { AlertCircle, Calendar, Zap, Loader2, Filter, CheckCircle2 } from 'lucide-react';
 
 const BOOKING_API_BASE = 'http://localhost:3003';
 
@@ -32,7 +32,9 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [filterStatus, setFilterStatus] = useState<FilterType>('all');
+  const [cancelingBookingId, setCancelingBookingId] = useState<string | null>(null);
 
   const getStoredUser = () => {
     const userData = localStorage.getItem('user');
@@ -99,6 +101,57 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
     loadBookings();
   }, []);
 
+  const handleCancelBooking = async (bookingId: string) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError('Missing auth token. Please log in again.');
+      return;
+    }
+
+    const confirmed = window.confirm('Cancel this booking? This will make the timeslot available again.');
+    if (!confirmed) return;
+
+    try {
+      setCancelingBookingId(bookingId);
+      setError('');
+      setSuccess('');
+
+      const response = await fetch(`${BOOKING_API_BASE}/bookings/${encodeURIComponent(bookingId)}/cancel`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await parseResponseBody(response);
+      if (!response.ok) {
+        setError(data.message || `Failed to cancel booking (HTTP ${response.status}).`);
+        return;
+      }
+
+      setBookings((prev) =>
+        prev.map((booking) =>
+          String(booking.id) === String(bookingId)
+            ? { ...booking, status: 'cancelled' }
+            : booking
+        )
+      );
+      setSuccess(`Booking #${bookingId} cancelled successfully. The timeslot is now available for booking.`);
+    } catch (err) {
+      console.error('Error cancelling booking:', err);
+      setError('Could not connect to booking service.');
+    } finally {
+      setCancelingBookingId(null);
+    }
+  };
+
+  const canCancelBooking = (booking: Booking) => {
+    const statusCancelable = booking.status === 'confirmed' || booking.status === 'pending';
+    const endTime = new Date(booking.end_time).getTime();
+    return statusCancelable && endTime > Date.now();
+  };
+
   const filteredBookings = useMemo(() => {
     if (filterStatus === 'all') {
       return bookings;
@@ -150,6 +203,13 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
         <div className="mb-6 flex items-start gap-3 rounded-lg bg-destructive/10 p-4 border border-destructive/20">
           <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
           <p className="text-sm text-destructive">{error}</p>
+        </div>
+      )}
+
+      {success && (
+        <div className="mb-6 flex items-start gap-3 rounded-lg bg-accent/10 p-4 border border-accent/20">
+          <CheckCircle2 className="h-5 w-5 text-accent flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-accent">{success}</p>
         </div>
       )}
 
@@ -266,6 +326,19 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
                             }
                           : undefined
                       }
+                      footerAction={
+                        canCancelBooking(booking) ? (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="w-full"
+                            disabled={cancelingBookingId === booking.id}
+                            onClick={() => handleCancelBooking(String(booking.id))}
+                          >
+                            {cancelingBookingId === booking.id ? 'Cancelling...' : 'Cancel Booking'}
+                          </Button>
+                        ) : undefined
+                      }
                     />
                   ))}
                 </div>
@@ -296,6 +369,19 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
                               pricePerKwh: booking.v2g_transaction.price_per_kwh,
                             }
                           : undefined
+                      }
+                      footerAction={
+                        canCancelBooking(booking) ? (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="w-full"
+                            disabled={cancelingBookingId === booking.id}
+                            onClick={() => handleCancelBooking(String(booking.id))}
+                          >
+                            {cancelingBookingId === booking.id ? 'Cancelling...' : 'Cancel Booking'}
+                          </Button>
+                        ) : undefined
                       }
                     />
                   ))}

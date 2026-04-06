@@ -11,6 +11,9 @@ const ProfileVO = ({ onNavigate, onLogout }) => {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [avatarPreview, setAvatarPreview] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const getStoredUser = () => {
     const userData = localStorage.getItem('user');
@@ -161,6 +164,52 @@ const ProfileVO = ({ onNavigate, onLogout }) => {
     if (avatarPreview !== user.avatar_url) {
       setAvatarPreview(user.avatar_url);
     }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!deletePassword.trim()) {
+      setError('Please enter your password');
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      setError('');
+      setSuccessMessage('');
+
+      const response = await fetch(`${USER_API_BASE}/users/${user.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          password: deletePassword,
+        }),
+      });
+
+      if (response.ok) {
+        setSuccessMessage('Account deleted successfully. Redirecting to login...');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setTimeout(() => {
+          onLogout();
+        }, 2000);
+      } else {
+        const data = await response.json();
+        setError(data.error || 'Failed to delete account');
+      }
+    } catch (err) {
+      console.error('Error deleting account:', err);
+      setError('Could not connect to server');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const closeDeleteModal = () => {
+    setShowDeleteModal(false);
+    setDeletePassword('');
+    setError('');
   };
 
   if (isLoading) {
@@ -565,7 +614,138 @@ const ProfileVO = ({ onNavigate, onLogout }) => {
             )}
           </div>
         </div>
+
+        {/* Delete Account Section */}
+        <div style={{
+          backgroundColor: '#1e293b',
+          borderRadius: '12px',
+          padding: '32px',
+          marginBottom: '32px',
+          borderTop: '3px solid #dc2626'
+        }}>
+          <h2 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '12px', color: '#dc2626' }}>Danger Zone</h2>
+          <p style={{ fontSize: '14px', color: '#cbd5e1', marginBottom: '20px' }}>
+            Permanently delete your account and all associated data. This action cannot be undone.
+          </p>
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            style={{
+              backgroundColor: '#dc2626',
+              color: '#fff',
+              padding: '10px 20px',
+              borderRadius: '8px',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '600'
+            }}
+          >
+            Delete Account
+          </button>
+        </div>
       </div>
+
+      {/* Delete Account Modal */}
+      {showDeleteModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.75)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: '#1e293b',
+            borderRadius: '12px',
+            padding: '32px',
+            maxWidth: '500px',
+            width: '90%',
+            color: '#fff'
+          }}>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '12px', color: '#dc2626' }}>
+              Delete Account
+            </h2>
+            <p style={{ fontSize: '14px', color: '#cbd5e1', marginBottom: '24px' }}>
+              Are you sure you want to delete your account? This action cannot be undone. Please enter your password to confirm.
+            </p>
+
+            {error && (
+              <div style={{
+                backgroundColor: '#dc2626',
+                color: '#fff',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                marginBottom: '16px',
+                fontSize: '14px'
+              }}>
+                {error}
+              </div>
+            )}
+
+            <input
+              type="password"
+              placeholder="Enter your password"
+              value={deletePassword}
+              onChange={(e) => setDeletePassword(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                border: '1px solid #475569',
+                backgroundColor: '#0f172a',
+                color: '#fff',
+                marginBottom: '24px',
+                fontSize: '14px',
+                boxSizing: 'border-box'
+              }}
+            />
+
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={isDeleting}
+                style={{
+                  backgroundColor: '#dc2626',
+                  color: '#fff',
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  cursor: isDeleting ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  flex: 1,
+                  opacity: isDeleting ? 0.7 : 1
+                }}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Account'}
+              </button>
+              <button
+                onClick={closeDeleteModal}
+                disabled={isDeleting}
+                style={{
+                  backgroundColor: '#6b7280',
+                  color: '#fff',
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  cursor: isDeleting ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  flex: 1,
+                  opacity: isDeleting ? 0.7 : 1
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

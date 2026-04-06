@@ -27,7 +27,8 @@ interface MyBookingsProps {
   onLogout: () => void;
 }
 
-type FilterType = 'all' | 'confirmed' | 'pending' | 'cancelled';
+type FilterType = 'all' | 'confirmed' | 'pending' | 'active' | 'cancelled';
+type BookingStatus = 'confirmed' | 'pending' | 'active' | 'cancelled';
 
 export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -36,6 +37,14 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
   const [success, setSuccess] = useState('');
   const [filterStatus, setFilterStatus] = useState<FilterType>('all');
   const [cancelingBookingId, setCancelingBookingId] = useState<string | null>(null);
+  const [startingBookingId, setStartingBookingId] = useState<string | null>(null);
+
+  const normalizeStatus = (status: string): BookingStatus => {
+    if (status === 'confirmed' || status === 'pending' || status === 'active' || status === 'cancelled') {
+      return status;
+    }
+    return 'pending';
+  };
 
   const getStoredUser = () => {
     const userData = localStorage.getItem('user');
@@ -147,10 +156,82 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
     }
   };
 
+  const handleStartBooking = async (booking: Booking) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError('Missing auth token. Please log in again.');
+      return;
+    }
+
+    const actionLabel = booking.type === 'bidirectional' ? 'start discharging' : 'start charging';
+    const confirmed = window.confirm(`Are you sure you want to ${actionLabel} now?`);
+    if (!confirmed) return;
+
+    try {
+      setStartingBookingId(String(booking.id));
+      setError('');
+      setSuccess('');
+
+      const response = await fetch(`${BOOKING_API_BASE}/bookings/${encodeURIComponent(String(booking.id))}/start`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await parseResponseBody(response);
+      if (!response.ok) {
+        setError(data.message || `Failed to start booking (HTTP ${response.status}).`);
+        return;
+      }
+
+      setBookings((prev) =>
+        prev.map((item) =>
+          String(item.id) === String(booking.id)
+            ? { ...item, status: 'active' }
+            : item
+        )
+      );
+
+      setSuccess(
+        booking.type === 'bidirectional'
+          ? `Discharging started for booking #${booking.id}.`
+          : `Charging started for booking #${booking.id}.`
+      );
+    } catch (err) {
+      console.error('Error starting booking:', err);
+      setError('Could not connect to booking service.');
+    } finally {
+      setStartingBookingId(null);
+    }
+  };
+
   const canCancelBooking = (booking: Booking) => {
     const statusCancelable = booking.status === 'confirmed' || booking.status === 'pending';
     const endTime = new Date(booking.end_time).getTime();
     return statusCancelable && endTime > Date.now();
+  };
+
+  const canStartBooking = (booking: Booking) => {
+    return normalizeStatus(booking.status) === 'confirmed';
+  };
+
+  const shouldShowStartButton = (booking: Booking) => {
+    if (normalizeStatus(booking.status) !== 'confirmed') {
+      return false;
+    }
+
+    const endTime = new Date(booking.end_time).getTime();
+    return endTime > Date.now();
+  };
+
+  const getStartButtonLabel = (booking: Booking) => {
+    const action = booking.type === 'bidirectional' ? 'Start Discharging' : 'Start Charging';
+    if (startingBookingId === booking.id) {
+      return 'Starting...';
+    }
+    return action;
   };
 
   const filteredBookings = useMemo(() => {
@@ -171,6 +252,7 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
       total: bookings.length,
       confirmed: bookings.filter((b) => b.status === 'confirmed').length,
       pending: bookings.filter((b) => b.status === 'pending').length,
+      active: bookings.filter((b) => b.status === 'active').length,
       cancelled: bookings.filter((b) => b.status === 'cancelled').length,
       totalEarnings: bookings.reduce((sum, b) => {
         if (b.v2g_transaction?.payment) {
@@ -230,6 +312,12 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
         </Card>
         <Card>
           <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground uppercase tracking-wide">Active</p>
+            <p className="mt-2 text-2xl font-bold text-blue-600">{stats.active}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground uppercase tracking-wide">V2G Earnings</p>
             <p className="mt-2 text-2xl font-bold text-accent">${stats.totalEarnings.toFixed(2)}</p>
           </CardContent>
@@ -260,6 +348,13 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
           onClick={() => setFilterStatus('pending')}
         >
           Pending ({stats.pending})
+        </Button>
+        <Button
+          variant={filterStatus === 'active' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setFilterStatus('active')}
+        >
+          Active ({stats.active})
         </Button>
         <Button
           variant={filterStatus === 'cancelled' ? 'default' : 'outline'}
@@ -312,7 +407,7 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
                       chargerId={booking.charger_id}
                       startTime={booking.start_time}
                       endTime={booking.end_time}
-                      status={booking.status as any}
+                      status={normalizeStatus(booking.status)}
                       v2gInfo={
                         booking.type === 'bidirectional' && booking.v2g_transaction
                           ? {
@@ -322,7 +417,17 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
                           : undefined
                       }
                       footerAction={
-                        canCancelBooking(booking) ? (
+                        shouldShowStartButton(booking) ? (
+                          <Button
+                            size="sm"
+                            className="w-full"
+                            disabled={startingBookingId === booking.id || !canStartBooking(booking)}
+                            onClick={() => handleStartBooking(booking)}
+                            title={canStartBooking(booking) ? undefined : 'Only confirmed bookings can be started.'}
+                          >
+                            {getStartButtonLabel(booking)}
+                          </Button>
+                        ) : canCancelBooking(booking) ? (
                           <Button
                             variant="destructive"
                             size="sm"
@@ -356,7 +461,7 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
                       chargerId={booking.charger_id}
                       startTime={booking.start_time}
                       endTime={booking.end_time}
-                      status={booking.status as any}
+                      status={normalizeStatus(booking.status)}
                       v2gInfo={
                         booking.type === 'bidirectional' && booking.v2g_transaction
                           ? {
@@ -366,7 +471,17 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
                           : undefined
                       }
                       footerAction={
-                        canCancelBooking(booking) ? (
+                        shouldShowStartButton(booking) ? (
+                          <Button
+                            size="sm"
+                            className="w-full"
+                            disabled={startingBookingId === booking.id || !canStartBooking(booking)}
+                            onClick={() => handleStartBooking(booking)}
+                            title={canStartBooking(booking) ? undefined : 'Only confirmed bookings can be started.'}
+                          >
+                            {getStartButtonLabel(booking)}
+                          </Button>
+                        ) : canCancelBooking(booking) ? (
                           <Button
                             variant="destructive"
                             size="sm"

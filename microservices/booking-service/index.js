@@ -43,14 +43,6 @@ const initDB = async () => {
             );
         `);
 
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS v2g_settings (
-                id SERIAL PRIMARY KEY,
-                price_per_kwh NUMERIC(10, 4) NOT NULL,
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            );
-        `);
-
         // Add column if older DB already exists
         await pool.query(`
             ALTER TABLE bookings
@@ -65,6 +57,14 @@ const initDB = async () => {
                 energy_discharged NUMERIC(12, 4) NOT NULL,
                 payment NUMERIC(12, 4) NOT NULL,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+        `);
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS v2g_settings (
+                id SERIAL PRIMARY KEY,
+                price_per_kwh NUMERIC(10, 4) NOT NULL,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
         `);
 
@@ -139,7 +139,7 @@ app.post('/bookings', async (req, res) => {
                 SELECT id
                 FROM bookings
                 WHERE charger_id = $1
-                  AND status IN ('pending', 'confirmed')
+                                    AND status IN ('pending', 'confirmed', 'active')
                   AND NOT (end_time <= $2 OR start_time >= $3)
                 LIMIT 1
             `,
@@ -170,22 +170,7 @@ app.post('/bookings', async (req, res) => {
         const booking = result.rows[0];
 
         if (normalizedType === 'bidirectional') {
-            let pricePerKwh = Number(process.env.V2G_PRICE_PER_KWH || '0.20');
-
-            try {
-                const priceResult = await pool.query(
-                    'SELECT price_per_kwh FROM v2g_settings ORDER BY updated_at DESC LIMIT 1'
-                );
-                if (priceResult.rows.length > 0) {
-                    const dbPrice = Number(priceResult.rows[0].price_per_kwh);
-                    if (Number.isFinite(dbPrice) && dbPrice > 0) {
-                        pricePerKwh = dbPrice;
-                    }
-                }
-            } catch (err) {
-                console.error('Error loading V2G price from settings, falling back to env/default:', err);
-            }
-
+            const pricePerKwh = Number(process.env.V2G_PRICE_PER_KWH || '0.20');
             const payment = pricePerKwh * energyKwh;
 
             const txResult = await pool.query(
@@ -298,7 +283,7 @@ app.get('/bookings/port/:port_id', async (req, res) => {
     const statusParam = String(req.query.status || 'active').toLowerCase();
     const now = new Date();
 
-    const ACTIVE_STATUSES = ['pending', 'confirmed'];
+    const ACTIVE_STATUSES = ['pending', 'confirmed', 'active'];
     const CANCELLED_STATUSES = ['cancelled'];
 
     let statuses = ACTIVE_STATUSES;
@@ -347,6 +332,69 @@ app.get('/bookings/:id', async (req, res) => {
         return res.json(result.rows[0]);
     } catch (error) {
         console.error('Error fetching booking by id:', error);
+        return res.status(500).json({ message: 'Server error' });
+    }
+});
+
+app.put('/bookings/:id/start', async (req, res) => {
+    const parsedBookingId = parsePositiveInt(req.params.id);
+    if (!parsedBookingId) {
+        return res.status(400).json({ message: 'Invalid booking id.' });
+    }
+
+    try {
+        const currentResult = await pool.query('SELECT * FROM bookings WHERE id = $1', [parsedBookingId]);
+        if (currentResult.rows.length === 0) {
+            return res.status(404).json({ message: 'Booking not found.' });
+        }
+
+        const current = currentResult.rows[0];
+        if (current.status !== 'confirmed') {
+            return res.status(400).json({ message: "Only confirmed bookings can be started." });
+        }
+
+        const updateResult = await pool.query(
+            `
+                UPDATE bookings
+                SET status = 'active'
+                WHERE id = $1
+                  AND status = 'confirmed'
+                  AND NOW() >= start_time
+                  AND NOW() < end_time
+                RETURNING *
+            `,
+            [parsedBookingId]
+        );
+
+        if (updateResult.rows.length === 0) {
+            const timeCheckResult = await pool.query(
+                'SELECT start_time, end_time FROM bookings WHERE id = $1',
+                [parsedBookingId]
+            );
+
+            if (timeCheckResult.rows.length === 0) {
+                return res.status(404).json({ message: 'Booking not found.' });
+            }
+
+            const timing = timeCheckResult.rows[0];
+            const startTime = new Date(timing.start_time);
+            const endTime = new Date(timing.end_time);
+            const now = new Date();
+
+            if (now < startTime) {
+                return res.status(400).json({ message: 'Booking can only be started once the scheduled start time is reached.' });
+            }
+
+            if (now >= endTime) {
+                return res.status(400).json({ message: 'This booking has already ended.' });
+            }
+
+            return res.status(400).json({ message: 'Booking cannot be started at this time.' });
+        }
+
+        return res.json(updateResult.rows[0]);
+    } catch (error) {
+        console.error('Error starting booking:', error);
         return res.status(500).json({ message: 'Server error' });
     }
 });
@@ -405,7 +453,7 @@ app.get('/chargers/:charger_id/timeslots', async (req, res) => {
                 SELECT start_time, end_time
                 FROM bookings
                 WHERE charger_id = $1
-                  AND status IN ('pending', 'confirmed')
+                                    AND status IN ('pending', 'confirmed', 'active')
                   AND start_time < $3
                   AND end_time > $2
                 ORDER BY start_time

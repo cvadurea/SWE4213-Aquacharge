@@ -1,9 +1,10 @@
 import { Building2, CalendarDays, Gauge, MapPin, Ship, UserCircle } from 'lucide-react';
+import { JSX } from 'react/jsx-runtime';
 
 export type NavigationItem = {
   label: string;
   id: string;
-  icon: JSX.Element;
+  icon: React.JSX.Element;
 };
 
 export const getVONavigation = (): NavigationItem[] => [

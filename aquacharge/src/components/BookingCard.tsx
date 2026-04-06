@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, Zap } from 'lucide-react';
 
-type BookingStatus = 'confirmed' | 'pending' | 'cancelled';
+type BookingStatus = 'confirmed' | 'pending' | 'active' | 'cancelled';
 
 interface BookingCardProps {
   id: string | number;
@@ -30,6 +30,7 @@ export default function BookingCard({
   const statusVariant = {
     confirmed: 'secondary' as const,
     pending: 'outline' as const,
+    active: 'default' as const,
     cancelled: 'destructive' as const,
   };
 

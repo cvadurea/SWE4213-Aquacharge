@@ -27,8 +27,8 @@ interface MyBookingsProps {
   onLogout: () => void;
 }
 
-type FilterType = 'all' | 'confirmed' | 'pending' | 'active' | 'cancelled';
-type BookingStatus = 'confirmed' | 'pending' | 'active' | 'cancelled';
+type FilterType = 'all' | 'confirmed' | 'pending' | 'active' | 'completed' | 'cancelled';
+type BookingStatus = 'confirmed' | 'pending' | 'active' | 'completed' | 'cancelled';
 
 export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -38,9 +38,10 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
   const [filterStatus, setFilterStatus] = useState<FilterType>('all');
   const [cancelingBookingId, setCancelingBookingId] = useState<string | null>(null);
   const [startingBookingId, setStartingBookingId] = useState<string | null>(null);
+  const [endingBookingId, setEndingBookingId] = useState<string | null>(null);
 
   const normalizeStatus = (status: string): BookingStatus => {
-    if (status === 'confirmed' || status === 'pending' || status === 'active' || status === 'cancelled') {
+    if (status === 'confirmed' || status === 'pending' || status === 'active' || status === 'completed' || status === 'cancelled') {
       return status;
     }
     return 'pending';
@@ -207,6 +208,53 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
     }
   };
 
+  const handleEndBooking = async (booking: Booking) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError('Missing auth token. Please log in again.');
+      return;
+    }
+
+    const actionLabel = booking.type === 'bidirectional' ? 'end discharging' : 'end charging';
+    const confirmed = window.confirm(`Are you sure you want to ${actionLabel} now?`);
+    if (!confirmed) return;
+
+    try {
+      setEndingBookingId(String(booking.id));
+      setError('');
+      setSuccess('');
+
+      const response = await fetch(`${BOOKING_API_BASE}/bookings/${encodeURIComponent(String(booking.id))}/end`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await parseResponseBody(response);
+      if (!response.ok) {
+        setError(data.message || `Failed to end booking (HTTP ${response.status}).`);
+        return;
+      }
+
+      setBookings((prev) =>
+        prev.map((item) =>
+          String(item.id) === String(booking.id)
+            ? { ...item, status: 'completed' }
+            : item
+        )
+      );
+
+      setSuccess(`Booking #${booking.id} marked as completed.`);
+    } catch (err) {
+      console.error('Error ending booking:', err);
+      setError('Could not connect to booking service.');
+    } finally {
+      setEndingBookingId(null);
+    }
+  };
+
   const canCancelBooking = (booking: Booking) => {
     const statusCancelable = booking.status === 'confirmed' || booking.status === 'pending';
     const endTime = new Date(booking.end_time).getTime();
@@ -224,6 +272,10 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
 
     const endTime = new Date(booking.end_time).getTime();
     return endTime > Date.now();
+  };
+
+  const shouldShowEndButton = (booking: Booking) => {
+    return normalizeStatus(booking.status) === 'active';
   };
 
   const getStartButtonLabel = (booking: Booking) => {
@@ -253,6 +305,7 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
       confirmed: bookings.filter((b) => b.status === 'confirmed').length,
       pending: bookings.filter((b) => b.status === 'pending').length,
       active: bookings.filter((b) => b.status === 'active').length,
+      completed: bookings.filter((b) => b.status === 'completed').length,
       cancelled: bookings.filter((b) => b.status === 'cancelled').length,
       totalEarnings: bookings.reduce((sum, b) => {
         if (b.v2g_transaction?.payment) {
@@ -291,7 +344,7 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
       )}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground uppercase tracking-wide">Total Bookings</p>
@@ -314,6 +367,12 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground uppercase tracking-wide">Active</p>
             <p className="mt-2 text-2xl font-bold text-blue-600">{stats.active}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground uppercase tracking-wide">Completed</p>
+            <p className="mt-2 text-2xl font-bold text-slate-500">{stats.completed}</p>
           </CardContent>
         </Card>
         <Card>
@@ -355,6 +414,13 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
           onClick={() => setFilterStatus('active')}
         >
           Active ({stats.active})
+        </Button>
+        <Button
+          variant={filterStatus === 'completed' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setFilterStatus('completed')}
+        >
+          Completed ({stats.completed})
         </Button>
         <Button
           variant={filterStatus === 'cancelled' ? 'default' : 'outline'}
@@ -417,16 +483,36 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
                           : undefined
                       }
                       footerAction={
-                        shouldShowStartButton(booking) ? (
+                        shouldShowEndButton(booking) ? (
                           <Button
                             size="sm"
                             className="w-full"
-                            disabled={startingBookingId === booking.id || !canStartBooking(booking)}
-                            onClick={() => handleStartBooking(booking)}
-                            title={canStartBooking(booking) ? undefined : 'Only confirmed bookings can be started.'}
+                            disabled={endingBookingId === booking.id}
+                            onClick={() => handleEndBooking(booking)}
                           >
-                            {getStartButtonLabel(booking)}
+                            {endingBookingId === booking.id ? 'Ending...' : 'End Booking'}
                           </Button>
+                        ) : shouldShowStartButton(booking) && canCancelBooking(booking) ? (
+                          <div className="grid grid-cols-2 gap-2">
+                            <Button
+                              size="sm"
+                              className="w-full"
+                              disabled={startingBookingId === booking.id || !canStartBooking(booking)}
+                              onClick={() => handleStartBooking(booking)}
+                              title={canStartBooking(booking) ? undefined : 'Only confirmed bookings can be started.'}
+                            >
+                              {getStartButtonLabel(booking)}
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              className="w-full"
+                              disabled={cancelingBookingId === booking.id}
+                              onClick={() => handleCancelBooking(String(booking.id))}
+                            >
+                              {cancelingBookingId === booking.id ? 'Cancelling...' : 'Cancel Booking'}
+                            </Button>
+                          </div>
                         ) : canCancelBooking(booking) ? (
                           <Button
                             variant="destructive"
@@ -471,16 +557,36 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
                           : undefined
                       }
                       footerAction={
-                        shouldShowStartButton(booking) ? (
+                        shouldShowEndButton(booking) ? (
                           <Button
                             size="sm"
                             className="w-full"
-                            disabled={startingBookingId === booking.id || !canStartBooking(booking)}
-                            onClick={() => handleStartBooking(booking)}
-                            title={canStartBooking(booking) ? undefined : 'Only confirmed bookings can be started.'}
+                            disabled={endingBookingId === booking.id}
+                            onClick={() => handleEndBooking(booking)}
                           >
-                            {getStartButtonLabel(booking)}
+                            {endingBookingId === booking.id ? 'Ending...' : 'End Booking'}
                           </Button>
+                        ) : shouldShowStartButton(booking) && canCancelBooking(booking) ? (
+                          <div className="grid grid-cols-2 gap-2">
+                            <Button
+                              size="sm"
+                              className="w-full"
+                              disabled={startingBookingId === booking.id || !canStartBooking(booking)}
+                              onClick={() => handleStartBooking(booking)}
+                              title={canStartBooking(booking) ? undefined : 'Only confirmed bookings can be started.'}
+                            >
+                              {getStartButtonLabel(booking)}
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              className="w-full"
+                              disabled={cancelingBookingId === booking.id}
+                              onClick={() => handleCancelBooking(String(booking.id))}
+                            >
+                              {cancelingBookingId === booking.id ? 'Cancelling...' : 'Cancel Booking'}
+                            </Button>
+                          </div>
                         ) : canCancelBooking(booking) ? (
                           <Button
                             variant="destructive"

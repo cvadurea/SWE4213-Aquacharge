@@ -399,6 +399,39 @@ app.put('/bookings/:id/start', async (req, res) => {
     }
 });
 
+app.put('/bookings/:id/end', async (req, res) => {
+    const parsedBookingId = parsePositiveInt(req.params.id);
+    if (!parsedBookingId) {
+        return res.status(400).json({ message: 'Invalid booking id.' });
+    }
+
+    try {
+        const currentResult = await pool.query('SELECT * FROM bookings WHERE id = $1', [parsedBookingId]);
+        if (currentResult.rows.length === 0) {
+            return res.status(404).json({ message: 'Booking not found.' });
+        }
+
+        const current = currentResult.rows[0];
+        if (current.status !== 'active') {
+            return res.status(400).json({ message: 'Only active bookings can be ended.' });
+        }
+
+        const updateResult = await pool.query(
+            "UPDATE bookings SET status = 'completed' WHERE id = $1 AND status = 'active' RETURNING *",
+            [parsedBookingId]
+        );
+
+        if (updateResult.rows.length === 0) {
+            return res.status(400).json({ message: 'Booking could not be ended.' });
+        }
+
+        return res.json(updateResult.rows[0]);
+    } catch (error) {
+        console.error('Error ending booking:', error);
+        return res.status(500).json({ message: 'Server error' });
+    }
+});
+
 app.put('/bookings/:id/cancel', async (req, res) => {
     const parsedBookingId = parsePositiveInt(req.params.id);
     if (!parsedBookingId) {
@@ -411,8 +444,13 @@ app.put('/bookings/:id/cancel', async (req, res) => {
             return res.status(404).json({ message: 'Booking not found.' });
         }
 
+        const current = currentResult.rows[0];
+        if (!['pending', 'confirmed'].includes(current.status)) {
+            return res.status(400).json({ message: 'Only pending or confirmed bookings can be cancelled.' });
+        }
+
         const updateResult = await pool.query(
-            "UPDATE bookings SET status = 'cancelled' WHERE id = $1 RETURNING *",
+            "UPDATE bookings SET status = 'cancelled' WHERE id = $1 AND status IN ('pending', 'confirmed') RETURNING *",
             [parsedBookingId]
         );
 

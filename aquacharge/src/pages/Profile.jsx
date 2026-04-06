@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import SidebarVO from '../components/SidebarVO';
+import SidebarPO from '../components/SidebarPO';
 
 const USER_API_BASE = 'http://localhost:3007';
 
-const ProfileVO = ({ onNavigate, onLogout }) => {
+const Profile = ({ onNavigate, onLogout }) => {
   const [user, setUser] = useState(null);
   const [editingField, setEditingField] = useState(null);
   const [editValue, setEditValue] = useState('');
@@ -212,10 +213,12 @@ const ProfileVO = ({ onNavigate, onLogout }) => {
     setError('');
   };
 
+  const Sidebar = user?.type === 'port_operator' ? SidebarPO : SidebarVO;
+
   if (isLoading) {
     return (
       <div style={{ display: 'flex', height: '100vh', backgroundColor: '#0f172a' }}>
-        <SidebarVO onNavigate={onNavigate} onLogout={onLogout} />
+        <Sidebar onNavigate={onNavigate} onLogout={onLogout} />
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
           <p>Loading profile...</p>
         </div>
@@ -226,7 +229,7 @@ const ProfileVO = ({ onNavigate, onLogout }) => {
   if (!user) {
     return (
       <div style={{ display: 'flex', height: '100vh', backgroundColor: '#0f172a' }}>
-        <SidebarVO onNavigate={onNavigate} onLogout={onLogout} />
+        <Sidebar onNavigate={onNavigate} onLogout={onLogout} />
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
           <p>User not found. Please log in again.</p>
         </div>
@@ -236,7 +239,7 @@ const ProfileVO = ({ onNavigate, onLogout }) => {
 
   return (
     <div style={{ display: 'flex', height: '100vh', backgroundColor: '#0f172a' }}>
-      <SidebarVO onNavigate={onNavigate} onLogout={onLogout} />
+      <Sidebar onNavigate={onNavigate} onLogout={onLogout} />
       
       <div style={{ flex: 1, padding: '40px', overflowY: 'auto', color: '#fff' }}>
         <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '40px' }}>My Profile</h1>
@@ -750,4 +753,4 @@ const ProfileVO = ({ onNavigate, onLogout }) => {
   );
 };
 
-export default ProfileVO;
+export default Profile;

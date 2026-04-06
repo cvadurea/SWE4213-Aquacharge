@@ -23,6 +23,10 @@ export default function SidebarPO({ onNavigate, onLogout }) {
     if (text === 'My Port' && onNavigate) {
       onNavigate('my-port');
     }
+
+    if (text === 'Profile' && onNavigate) {
+      onNavigate('profile');
+    }
   };
 
   const list = (
@@ -51,11 +55,13 @@ export default function SidebarPO({ onNavigate, onLogout }) {
           <ListItem key={text} disablePadding>
             <ListItemButton
               sx={text === 'Logout' ? { color: 'error.main' } : {}}
-              onClick={text === 'Logout' ? () => {
-                if (onLogout) {
+              onClick={() => {
+                if (text === 'Logout' && onLogout) {
                   onLogout();
+                } else if (text === 'Profile') {
+                  handleNavigation('Profile');
                 }
-              } : undefined}
+              }}
             >
               <ListItemText
                 primary={text}

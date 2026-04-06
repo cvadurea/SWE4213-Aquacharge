@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import BookingCard from '@/components/BookingCard';
+import { getVONavigation } from '@/lib/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, Calendar, Zap, Loader2, Filter, CheckCircle2 } from 'lucide-react';
@@ -180,13 +181,7 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
     };
   }, [bookings]);
 
-  const navigation = [
-    { label: 'Dashboard', id: 'dashboard', icon: <Zap className="h-4 w-4" /> },
-    { label: 'Find Chargers', id: 'find-chargers', icon: <Calendar className="h-4 w-4" /> },
-    { label: 'My Bookings', id: 'my-bookings', icon: <Calendar className="h-4 w-4" /> },
-    { label: 'My Vessels', id: 'my-vessels', icon: <Zap className="h-4 w-4" /> },
-    { label: 'Profile', id: 'profile', icon: <Zap className="h-4 w-4" /> },
-  ];
+  const navigation = getVONavigation();
 
   return (
     <DashboardLayout

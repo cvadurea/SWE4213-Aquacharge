@@ -14,6 +14,10 @@ interface Port {
   id: string;
   name: string;
   location?: string;
+  port_name?: string;
+  address?: string;
+  capacity?: number;
+  available_charging_points?: number;
 }
 
 interface Charger {
@@ -194,6 +198,24 @@ export default function FindChargers({ onNavigate, onLogout }: FindChargersProps
     } finally {
       setIsChargersLoading(false);
     }
+  };
+
+  const handlePortSelect = async (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedPortId = event.target.value;
+
+    if (!selectedPortId) {
+      setSelectedPort(null);
+      setAvailableChargers([]);
+      return;
+    }
+
+    const port = ports.find((item) => String(item.id) === String(selectedPortId));
+    if (!port) {
+      setError('Selected port could not be found.');
+      return;
+    }
+
+    await getPortChargers(port);
   };
 
   const createBooking = async (charger: Charger, timeslot: Timeslot, options: any = {}) => {
@@ -492,26 +514,43 @@ export default function FindChargers({ onNavigate, onLogout }: FindChargersProps
               <p className="text-muted-foreground">No ports available</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {ports.map((port) => (
-                <button
-                  key={port.id}
-                  onClick={() => getPortChargers(port)}
-                  className={`p-4 rounded-lg border-2 transition-all duration-200 text-left ${
-                    selectedPort?.id === port.id
-                      ? 'border-secondary bg-secondary/10'
-                      : 'border-border hover:border-secondary/50 hover:bg-card'
-                  }`}
-                >
-                  <p className="font-semibold text-foreground">{port.name}</p>
-                  {port.location && (
+            <div className="space-y-3">
+              <label htmlFor="port-select" className="text-sm text-muted-foreground block">
+                Available Ports
+              </label>
+
+              <select
+                id="port-select"
+                value={selectedPort?.id || ''}
+                onChange={handlePortSelect}
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-foreground"
+              >
+                <option value="">Select a port...</option>
+                {ports.map((port) => (
+                  <option key={port.id} value={port.id}>
+                    {port.port_name || port.name || `Port #${port.id}`}
+                  </option>
+                ))}
+              </select>
+
+              {selectedPort && (
+                <div className="p-4 rounded-lg border border-secondary/40 bg-secondary/10">
+                  <p className="font-semibold text-foreground">
+                    {selectedPort.port_name || selectedPort.name || `Port #${selectedPort.id}`}
+                  </p>
+                  {(selectedPort.address || selectedPort.location) && (
                     <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
                       <MapPin className="h-3 w-3" />
-                      {port.location}
+                      {selectedPort.address || selectedPort.location}
                     </p>
                   )}
-                </button>
-              ))}
+                  {(typeof selectedPort.capacity !== 'undefined' || typeof selectedPort.available_charging_points !== 'undefined') && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Capacity: {selectedPort.capacity ?? '-'} • Available Points: {selectedPort.available_charging_points ?? '-'}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </CardContent>
@@ -521,7 +560,9 @@ export default function FindChargers({ onNavigate, onLogout }: FindChargersProps
       {selectedPort && (
         <Card>
           <CardHeader>
-            <CardTitle>Available Chargers at {selectedPort.name}</CardTitle>
+            <CardTitle>
+              Available Chargers at {selectedPort.port_name || selectedPort.name || `Port #${selectedPort.id}`}
+            </CardTitle>
             <CardDescription>Click a charger to select a booking timeslot</CardDescription>
           </CardHeader>
           <CardContent>

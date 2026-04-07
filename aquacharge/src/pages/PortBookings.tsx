@@ -15,9 +15,20 @@ interface PortBookingsProps {
 
 export default function PortBookings({ onLogout, onNavigate }: PortBookingsProps) {
   const [portId, setPortId] = useState<string | number | null>(null);
-  const [bookings, setBookings] = useState<any[]>([]);
+  const [activeBookings, setActiveBookings] = useState<any[]>([]);
+  const [verificationBookings, setVerificationBookings] = useState<any[]>([]);
+  const [selectedVerificationBookingId, setSelectedVerificationBookingId] = useState<string | number | null>(null);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+
+  const parseResponseBody = async (response: Response) => {
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      return response.json();
+    }
+    const text = await response.text();
+    return { message: text || 'Unexpected response from server' };
+  };
 
   useEffect(() => {
     const loadBookings = async () => {
@@ -44,9 +55,17 @@ export default function PortBookings({ onLogout, onNavigate }: PortBookingsProps
 
         setPortId(matchedPort.id);
 
-        const bookingsResponse = await fetch(`${BOOKING_API_BASE}/bookings/port/${matchedPort.id}`);
-        const bookingsData = await bookingsResponse.json();
-        setBookings(Array.isArray(bookingsData) ? bookingsData : []);
+        const [activeResponse, verificationResponse] = await Promise.all([
+          fetch(`${BOOKING_API_BASE}/bookings/port/${matchedPort.id}?status=active`),
+          fetch(`${BOOKING_API_BASE}/bookings/port/${matchedPort.id}?status=verification`),
+        ]);
+
+        const activeData = await parseResponseBody(activeResponse);
+        const verificationData = await parseResponseBody(verificationResponse);
+
+        setActiveBookings(Array.isArray(activeData) ? activeData : []);
+        setVerificationBookings(Array.isArray(verificationData) ? verificationData : []);
+        setSelectedVerificationBookingId(null);
       } catch (err) {
         console.error('Error loading port bookings:', err);
         setError('Could not connect to booking service.');
@@ -57,6 +76,31 @@ export default function PortBookings({ onLogout, onNavigate }: PortBookingsProps
 
     loadBookings();
   }, []);
+
+  const handleVerification = async (bookingId: string | number, verified: boolean) => {
+    try {
+      setError('');
+
+      const response = await fetch(`${BOOKING_API_BASE}/bookings/${encodeURIComponent(String(bookingId))}/verification`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ verified }),
+      });
+
+      const data = await parseResponseBody(response);
+      if (!response.ok) {
+        setError(data.message || `Failed to update verification (HTTP ${response.status}).`);
+        return;
+      }
+
+      setVerificationBookings((prev) => prev.filter((booking) => String(booking.id) !== String(bookingId)));
+    } catch (err) {
+      console.error('Error updating verification:', err);
+      setError('Could not connect to booking service.');
+    }
+  };
 
   const navigation = getPONavigation();
 
@@ -79,33 +123,91 @@ export default function PortBookings({ onLogout, onNavigate }: PortBookingsProps
 
       <Card>
         <CardHeader>
-          <CardTitle>Active Bookings {portId ? `for Port #${portId}` : ''}</CardTitle>
+          <CardTitle>Bookings {portId ? `for Port #${portId}` : ''}</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Loading bookings...</p>
-          ) : bookings.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No active bookings found.</p>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {bookings.map((booking) => (
-                <BookingCard
-                  key={booking.id}
-                  id={booking.id}
-                  chargerId={booking.charger_id}
-                  startTime={booking.start_time}
-                  endTime={booking.end_time}
-                  status={booking.status}
-                  v2gInfo={
-                    booking.v2g_transaction
-                      ? {
-                          energyDischarged: booking.v2g_transaction.energy_discharged,
-                          pricePerKwh: booking.v2g_transaction.price_per_kwh,
+            <div className="space-y-8">
+              <div>
+                <h3 className="mb-3 text-lg font-semibold">Pending Verification</h3>
+                {verificationBookings.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No bookings pending verification.</p>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {verificationBookings.map((booking) => (
+                      <BookingCard
+                        key={booking.id}
+                        id={booking.id}
+                        chargerId={booking.charger_id}
+                        startTime={booking.start_time}
+                        endTime={booking.end_time}
+                        status={booking.status}
+                        v2gInfo={
+                          booking.v2g_transaction
+                            ? {
+                                energyDischarged: booking.v2g_transaction.energy_discharged,
+                                pricePerKwh: booking.v2g_transaction.price_per_kwh,
+                              }
+                            : booking.v2g_energy_discharged
+                              ? {
+                                  energyDischarged: booking.v2g_energy_discharged,
+                                  pricePerKwh: booking.v2g_price_per_kwh || 0,
+                                }
+                              : undefined
                         }
-                      : undefined
-                  }
-                />
-              ))}
+                        v2gLabel="Promised energy"
+                        onClick={() => setSelectedVerificationBookingId(booking.id)}
+                        footerAction={
+                          <div className={`grid grid-cols-2 gap-2 ${String(selectedVerificationBookingId) === String(booking.id) ? 'ring-2 ring-primary/30 rounded-md p-1' : ''}`}>
+                            <button
+                              className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-500"
+                              onClick={() => handleVerification(booking.id, true)}
+                            >
+                              Confirm verification
+                            </button>
+                            <button
+                              className="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-white transition-colors hover:opacity-90"
+                              onClick={() => handleVerification(booking.id, false)}
+                            >
+                              Failed verification
+                            </button>
+                          </div>
+                        }
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <h3 className="mb-3 text-lg font-semibold">Active Bookings</h3>
+                {activeBookings.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No active bookings found.</p>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {activeBookings.map((booking) => (
+                      <BookingCard
+                        key={booking.id}
+                        id={booking.id}
+                        chargerId={booking.charger_id}
+                        startTime={booking.start_time}
+                        endTime={booking.end_time}
+                        status={booking.status}
+                        v2gInfo={
+                          booking.v2g_transaction
+                            ? {
+                                energyDischarged: booking.v2g_transaction.energy_discharged,
+                                pricePerKwh: booking.v2g_transaction.price_per_kwh,
+                              }
+                            : undefined
+                        }
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </CardContent>

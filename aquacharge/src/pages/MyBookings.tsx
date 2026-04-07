@@ -27,8 +27,8 @@ interface MyBookingsProps {
   onLogout: () => void;
 }
 
-type FilterType = 'all' | 'confirmed' | 'pending' | 'active' | 'completed' | 'cancelled';
-type BookingStatus = 'confirmed' | 'pending' | 'active' | 'completed' | 'cancelled';
+type FilterType = 'all' | 'confirmed' | 'pending' | 'active' | 'pending_verification' | 'completed' | 'failed' | 'cancelled';
+type BookingStatus = 'confirmed' | 'pending' | 'active' | 'pending_verification' | 'completed' | 'failed' | 'cancelled';
 
 export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -41,10 +41,16 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
   const [endingBookingId, setEndingBookingId] = useState<string | null>(null);
 
   const normalizeStatus = (status: string): BookingStatus => {
-    if (status === 'confirmed' || status === 'pending' || status === 'active' || status === 'completed' || status === 'cancelled') {
+    if (status === 'confirmed' || status === 'pending' || status === 'active' || status === 'pending_verification' || status === 'completed' || status === 'failed' || status === 'cancelled') {
       return status;
     }
     return 'pending';
+  };
+
+  const formatStatusLabel = (status: string) => {
+    return status
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (character) => character.toUpperCase());
   };
 
   const getStoredUser = () => {
@@ -238,15 +244,21 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
         return;
       }
 
+      const nextStatus = booking.type === 'bidirectional' ? 'pending_verification' : 'completed';
+
       setBookings((prev) =>
         prev.map((item) =>
           String(item.id) === String(booking.id)
-            ? { ...item, status: 'completed' }
+            ? { ...item, status: nextStatus }
             : item
         )
       );
 
-      setSuccess(`Booking #${booking.id} marked as completed.`);
+      setSuccess(
+        booking.type === 'bidirectional'
+          ? `Booking #${booking.id} is now pending verification.`
+          : `Booking #${booking.id} marked as completed.`
+      );
     } catch (err) {
       console.error('Error ending booking:', err);
       setError('Could not connect to booking service.');
@@ -305,7 +317,9 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
       confirmed: bookings.filter((b) => b.status === 'confirmed').length,
       pending: bookings.filter((b) => b.status === 'pending').length,
       active: bookings.filter((b) => b.status === 'active').length,
+      pendingVerification: bookings.filter((b) => b.status === 'pending_verification').length,
       completed: bookings.filter((b) => b.status === 'completed').length,
+      failed: bookings.filter((b) => b.status === 'failed').length,
       cancelled: bookings.filter((b) => b.status === 'cancelled').length,
       totalEarnings: bookings.reduce((sum, b) => {
         if (b.v2g_transaction?.payment) {
@@ -371,6 +385,12 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
         </Card>
         <Card>
           <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground uppercase tracking-wide">Pending Verification</p>
+            <p className="mt-2 text-2xl font-bold text-amber-500">{stats.pendingVerification}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground uppercase tracking-wide">Completed</p>
             <p className="mt-2 text-2xl font-bold text-slate-500">{stats.completed}</p>
           </CardContent>
@@ -416,11 +436,25 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
           Active ({stats.active})
         </Button>
         <Button
+          variant={filterStatus === 'pending_verification' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setFilterStatus('pending_verification')}
+        >
+          Pending Verification ({stats.pendingVerification})
+        </Button>
+        <Button
           variant={filterStatus === 'completed' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setFilterStatus('completed')}
         >
           Completed ({stats.completed})
+        </Button>
+        <Button
+          variant={filterStatus === 'failed' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setFilterStatus('failed')}
+        >
+          Failed ({stats.failed})
         </Button>
         <Button
           variant={filterStatus === 'cancelled' ? 'default' : 'outline'}
@@ -444,7 +478,7 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
             <p className="text-muted-foreground mb-4">
               {filterStatus === 'all'
                 ? 'No bookings yet'
-                : `No ${filterStatus} bookings`}
+                : `No ${formatStatusLabel(filterStatus)} bookings`}
             </p>
             <Button onClick={() => onNavigate('find-chargers')}>
               Find Chargers
@@ -458,7 +492,7 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
             <Card>
               <CardHeader>
                 <CardTitle>
-                  {filterStatus === 'all' ? 'Recent Bookings' : `${filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1)} Bookings`}
+                  {filterStatus === 'all' ? 'Recent Bookings' : `${formatStatusLabel(filterStatus)} Bookings`}
                 </CardTitle>
                 <CardDescription>
                   Showing {sortedBookings.length} booking{sortedBookings.length !== 1 ? 's' : ''}

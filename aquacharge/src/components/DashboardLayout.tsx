@@ -1,8 +1,7 @@
-import React from 'react';
-import { Sidebar } from '@/components/ui/sidebar';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { LogOut, Menu } from 'lucide-react';
-import { useState } from 'react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { LogOut, Menu, Settings, UserCircle } from 'lucide-react';
 
 interface DashboardLayoutProps {
   title: string;
@@ -30,15 +29,52 @@ export default function DashboardLayout({
   userType,
 }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    const rawUser = localStorage.getItem('user');
+    if (!rawUser) return;
+
+    try {
+      setCurrentUser(JSON.parse(rawUser));
+    } catch {
+      setCurrentUser(null);
+    }
+  }, []);
+
+  const userInitials = useMemo(() => {
+    const first = String(currentUser?.first_name || '').trim();
+    const last = String(currentUser?.last_name || '').trim();
+
+    if (first || last) {
+      return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase();
+    }
+
+    if (currentUser?.email) {
+      return String(currentUser.email).charAt(0).toUpperCase();
+    }
+
+    return userType === 'vessel_owner' ? 'VO' : 'PO';
+  }, [currentUser, userType]);
+
+  const userDisplayName = useMemo(() => {
+    const first = String(currentUser?.first_name || '').trim();
+    const last = String(currentUser?.last_name || '').trim();
+    const fullName = `${first} ${last}`.trim();
+
+    if (fullName) return fullName;
+    if (currentUser?.email) return String(currentUser.email);
+    return userType === 'vessel_owner' ? 'Vessel Owner' : 'Port Operator';
+  }, [currentUser, userType]);
 
   return (
     <div className="flex h-screen bg-background">
       {/* Sidebar */}
-      <div className="hidden md:flex md:w-56 md:flex-col md:bg-sidebar md:text-sidebar-foreground">
-        <div className="flex items-center justify-between border-b border-sidebar-border px-6 py-4">
+      <div className="hidden md:flex md:w-64 md:flex-col md:bg-sidebar md:text-sidebar-foreground">
+        <div className="border-b border-sidebar-border px-6 py-5">
           <div>
-            <h1 className="text-lg font-bold text-sidebar-foreground">AquaCharge</h1>
-            <p className="text-xs text-sidebar-foreground/70 mt-1">
+            <h1 className="text-xl font-bold text-sidebar-foreground">AquaCharge</h1>
+            <p className="mt-1 text-sm text-sidebar-foreground/70">
               {userType === 'vessel_owner' ? 'Vessel Owner' : 'Port Operator'}
             </p>
           </div>
@@ -50,13 +86,13 @@ export default function DashboardLayout({
             <button
               key={item.id}
               onClick={() => onNavigate(item.id)}
-              className={`w-full flex items-center gap-3 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
+              className={`w-full flex items-center gap-3 rounded-lg px-4 py-2.5 text-base font-medium transition-all duration-200 ${
                 currentPage === item.id
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground'
                   : 'text-sidebar-foreground hover:bg-sidebar-accent/20'
               }`}
             >
-              {item.icon && <span className="h-4 w-4">{item.icon}</span>}
+              {item.icon && <span className="h-5 w-5">{item.icon}</span>}
               {item.label}
             </button>
           ))}
@@ -64,13 +100,50 @@ export default function DashboardLayout({
 
         {/* Logout Button */}
         <div className="border-t border-sidebar-border p-4">
+          <div className="mb-4 flex items-center gap-3 px-1 py-1">
+            <Avatar className="h-12 w-12 ring-2 ring-sidebar-accent/40">
+              <AvatarImage src={currentUser?.avatar_url || ''} alt={userDisplayName} />
+              <AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground text-sm font-semibold">
+                {userInitials}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <p className="truncate text-lg font-semibold text-sidebar-foreground">{userDisplayName}</p>
+              <p className="truncate text-sm text-sidebar-foreground/70">{currentUser?.email || 'Account'}</p>
+            </div>
+          </div>
+
+          <div className="mb-3 space-y-1">
+            <button
+              onClick={() => onNavigate('profile')}
+              className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${
+                currentPage === 'profile'
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent/20'
+              }`}
+            >
+              <UserCircle className="h-4 w-4" />
+              Profile
+            </button>
+            <button
+              onClick={() => onNavigate('settings')}
+              className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${
+                currentPage === 'settings'
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent/20'
+              }`}
+            >
+              <Settings className="h-4 w-4" />
+              Settings
+            </button>
+          </div>
+
           <Button
             onClick={onLogout}
             variant="outline"
-            size="sm"
-            className="w-full justify-start gap-2 text-sidebar-foreground border-sidebar-border hover:bg-sidebar-accent/20"
+            className="w-full justify-start gap-2 text-base text-sidebar-foreground border-sidebar-border hover:bg-sidebar-accent/20"
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut className="h-5 w-5" />
             Logout
           </Button>
         </div>

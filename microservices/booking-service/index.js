@@ -17,6 +17,7 @@ app.use((req, res, next) => {
 });
 
 const PORT = 3003;
+const NOTIFICATION_SERVICE_URL = process.env.NOTIFICATION_SERVICE_URL || 'http://notification-service:3005';
 
 const pool = new Pool({
     host: process.env.DB_HOST || 'booking-db',
@@ -108,6 +109,39 @@ const parsePositiveInt = (value) => {
     return number;
 };
 
+const sendBookingConfirmationNotification = async ({ userId, booking }) => {
+    try {
+        const response = await fetch(`${NOTIFICATION_SERVICE_URL}/notifications/booking-confirmation`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                user_id: userId,
+                booking,
+            }),
+        });
+
+        const contentType = response.headers.get('content-type') || '';
+        const body = contentType.includes('application/json')
+            ? await response.json()
+            : { message: await response.text() };
+
+        if (!response.ok) {
+            console.error('Booking confirmation notification failed:', response.status, body);
+            return;
+        }
+
+        console.log('Booking confirmation notification sent/queued:', {
+            bookingId: booking.id,
+            userId,
+            notification: body,
+        });
+    } catch (error) {
+        console.error('Error calling notification service:', error);
+    }
+};
+
 app.post('/bookings', async (req, res) => {
     const { user_id, vessel_id, port_id, charger_id, start_time, end_time, booking_type, energy_discharged_kwh } = req.body;
 
@@ -195,6 +229,14 @@ app.post('/bookings', async (req, res) => {
         );
 
         const booking = result.rows[0];
+
+        // Fire-and-forget so booking creation is not blocked by notification latency/failures.
+        setImmediate(() => {
+            void sendBookingConfirmationNotification({
+                userId: parsedUserId,
+                booking,
+            });
+        });
 
         return res.status(201).json(booking);
     } catch (error) {

@@ -61,6 +61,7 @@ services:
       DB_USER: postgres
       DB_PASSWORD: postgres
       JWT_SECRET: "bwf8734tir87y2o83dyro94jo192o9sy1j8734ytrjm192y9efh879s1y379"
+      NOTIFICATION_SERVICE_URL: http://notification-service:3005
     depends_on:
       - booking-db
     networks:
@@ -94,6 +95,14 @@ services:
       DB_NAME: notificationdb
       DB_USER: postgres
       DB_PASSWORD: postgres
+      USER_SERVICE_URL: http://user-service:3007
+      NOTIFICATION_FROM: AquaCharge <no-reply@aquacharge.local>
+      # Set these in a local .env file under microservices/.
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
     # healthcheck:
     #   test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
     #   interval: 10s

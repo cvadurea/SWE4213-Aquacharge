@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: aquacharge
+resources:
+  - 00-namespace.yaml
+  - 01-secrets-config.yaml
+  - 02-postgres.yaml
+  - 03-backend.yaml
+  - 04-frontend-ingress.yaml

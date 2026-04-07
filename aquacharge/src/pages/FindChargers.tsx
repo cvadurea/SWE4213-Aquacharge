@@ -268,9 +268,9 @@ export default function FindChargers({ onNavigate, onLogout }: FindChargersProps
         return false;
       }
 
-      if (data?.v2g_transaction) {
+      if (bookingType === 'bidirectional') {
         setBookingStatus(
-          `Booking confirmed (V2G) for charger #${charger.id} using ${primaryVessel.vessel_name}. Discharge: ${data.v2g_transaction.energy_discharged} kW.`
+          `Bidirectional booking confirmed for charger #${charger.id} using ${primaryVessel.vessel_name}. It will move to pending verification after it ends.`
         );
       } else {
         setBookingStatus(`Booking confirmed for charger #${charger.id} using ${primaryVessel.vessel_name}.`);

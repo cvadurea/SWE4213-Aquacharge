@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, Zap } from 'lucide-react';
 
-type BookingStatus = 'confirmed' | 'pending' | 'active' | 'completed' | 'cancelled';
+type BookingStatus = 'confirmed' | 'pending' | 'active' | 'completed' | 'cancelled' | 'pending_verification' | 'failed';
 
 interface BookingCardProps {
   id: string | number;
@@ -15,7 +15,9 @@ interface BookingCardProps {
     energyDischarged: number;
     pricePerKwh: number;
   };
+  v2gLabel?: string;
   footerAction?: React.ReactNode;
+  onClick?: () => void;
 }
 
 export default function BookingCard({
@@ -25,7 +27,9 @@ export default function BookingCard({
   endTime,
   status = 'confirmed',
   v2gInfo,
+  v2gLabel = 'V2G',
   footerAction,
+  onClick,
 }: BookingCardProps) {
   const statusVariant = {
     confirmed: 'secondary' as const,
@@ -33,6 +37,14 @@ export default function BookingCard({
     active: 'default' as const,
     completed: 'secondary' as const,
     cancelled: 'destructive' as const,
+    pending_verification: 'outline' as const,
+    failed: 'destructive' as const,
+  };
+
+  const formatStatus = (value: BookingStatus) => {
+    return value
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (character) => character.toUpperCase());
   };
 
   const formatDateTime = (dateString: string) => {
@@ -40,7 +52,22 @@ export default function BookingCard({
   };
 
   return (
-    <Card className="hover:shadow-lg transition-all duration-300">
+    <Card
+      className={`transition-all duration-300 ${onClick ? 'cursor-pointer hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ring' : 'hover:shadow-lg'}`}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={
+        onClick
+          ? (event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+    >
       <CardContent className="space-y-3">
         <div className="flex items-start justify-between">
           <div>
@@ -52,7 +79,7 @@ export default function BookingCard({
             </p>
           </div>
           <Badge variant={statusVariant[status] as any}>
-            {status.charAt(0).toUpperCase() + status.slice(1)}
+            {formatStatus(status)}
           </Badge>
         </div>
 
@@ -72,7 +99,7 @@ export default function BookingCard({
             <div className="flex items-center gap-2 text-sm text-accent font-medium">
               <Zap className="h-4 w-4" />
               <span>
-                V2G: {v2gInfo.energyDischarged} kW @ ${v2gInfo.pricePerKwh.toFixed(2)}/kW
+                {v2gLabel}: {v2gInfo.energyDischarged} kW @ ${Number(v2gInfo.pricePerKwh).toFixed(2)}/kW
               </span>
             </div>
           </div>

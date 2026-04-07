@@ -39,6 +39,8 @@ const initDB = async () => {
                 end_time TIMESTAMPTZ NOT NULL,
                 type VARCHAR(30) NOT NULL DEFAULT 'regular',
                 status VARCHAR(20) NOT NULL DEFAULT 'confirmed',
+                v2g_energy_discharged NUMERIC(12, 4),
+                v2g_price_per_kwh NUMERIC(10, 4),
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
         `);
@@ -47,6 +49,16 @@ const initDB = async () => {
         await pool.query(`
             ALTER TABLE bookings
             ADD COLUMN IF NOT EXISTS type VARCHAR(30) NOT NULL DEFAULT 'regular';
+        `);
+
+        await pool.query(`
+            ALTER TABLE bookings
+            ADD COLUMN IF NOT EXISTS v2g_energy_discharged NUMERIC(12, 4);
+        `);
+
+        await pool.query(`
+            ALTER TABLE bookings
+            ADD COLUMN IF NOT EXISTS v2g_price_per_kwh NUMERIC(10, 4);
         `);
 
         await pool.query(`
@@ -126,12 +138,14 @@ app.post('/bookings', async (req, res) => {
         }
 
         let energyKwh = null;
+        let pricePerKwh = null;
         if (normalizedType === 'bidirectional') {
             const parsedEnergy = Number(energy_discharged_kwh);
             if (!Number.isFinite(parsedEnergy) || parsedEnergy <= 0) {
                 return res.status(400).json({ message: 'energy_discharged_kwh must be a positive number for bidirectional bookings.' });
             }
             energyKwh = parsedEnergy;
+            pricePerKwh = Number(process.env.V2G_PRICE_PER_KWH || '0.20');
         }
 
         const overlapResult = await pool.query(
@@ -152,8 +166,19 @@ app.post('/bookings', async (req, res) => {
 
         const result = await pool.query(
             `
-                INSERT INTO bookings (user_id, vessel_id, port_id, charger_id, start_time, end_time, type, status)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, 'confirmed')
+                INSERT INTO bookings (
+                    user_id,
+                    vessel_id,
+                    port_id,
+                    charger_id,
+                    start_time,
+                    end_time,
+                    type,
+                    status,
+                    v2g_energy_discharged,
+                    v2g_price_per_kwh
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, 'confirmed', $8, $9)
                 RETURNING *
             `,
             [
@@ -164,26 +189,12 @@ app.post('/bookings', async (req, res) => {
                 startTime.toISOString(),
                 endTime.toISOString(),
                 normalizedType,
+                energyKwh,
+                pricePerKwh,
             ]
         );
 
         const booking = result.rows[0];
-
-        if (normalizedType === 'bidirectional') {
-            const pricePerKwh = Number(process.env.V2G_PRICE_PER_KWH || '0.20');
-            const payment = pricePerKwh * energyKwh;
-
-            const txResult = await pool.query(
-                `
-                    INSERT INTO v2g_transactions (booking_id, price_per_kwh, energy_discharged, payment)
-                    VALUES ($1, $2, $3, $4)
-                    RETURNING *
-                `,
-                [booking.id, pricePerKwh, energyKwh, payment]
-            );
-
-            return res.status(201).json({ ...booking, v2g_transaction: txResult.rows[0] });
-        }
 
         return res.status(201).json(booking);
     } catch (error) {
@@ -285,29 +296,43 @@ app.get('/bookings/port/:port_id', async (req, res) => {
 
     const ACTIVE_STATUSES = ['pending', 'confirmed', 'active'];
     const CANCELLED_STATUSES = ['cancelled'];
+    const VERIFICATION_STATUSES = ['pending_verification'];
+    const COMPLETED_STATUSES = ['completed'];
+    const FAILED_STATUSES = ['failed'];
 
     let statuses = ACTIVE_STATUSES;
+    let includeTimeFilter = true;
     if (statusParam === 'all') {
-        statuses = [...ACTIVE_STATUSES, ...CANCELLED_STATUSES];
+        statuses = [...ACTIVE_STATUSES, ...CANCELLED_STATUSES, ...VERIFICATION_STATUSES, ...COMPLETED_STATUSES, ...FAILED_STATUSES];
     } else if (statusParam === 'cancelled') {
         statuses = CANCELLED_STATUSES;
+    } else if (statusParam === 'verification') {
+        statuses = VERIFICATION_STATUSES;
+        includeTimeFilter = false;
+    } else if (statusParam === 'completed') {
+        statuses = COMPLETED_STATUSES;
+        includeTimeFilter = false;
+    } else if (statusParam === 'failed') {
+        statuses = FAILED_STATUSES;
+        includeTimeFilter = false;
     } else if (statusParam === 'active') {
         statuses = ACTIVE_STATUSES;
     } else {
-        return res.status(400).json({ message: "Invalid status. Use 'active', 'cancelled', or 'all'." });
+        return res.status(400).json({ message: "Invalid status. Use 'active', 'verification', 'completed', 'failed', 'cancelled', or 'all'." });
     }
 
     try {
+        const timeClause = includeTimeFilter ? 'AND end_time > $3' : '';
         const result = await pool.query(
             `
                 SELECT *
                 FROM bookings
                 WHERE port_id = $1
                   AND status = ANY($2)
-                  AND end_time > $3
+                  ${timeClause}
                 ORDER BY start_time ASC
             `,
-            [parsedPortId, statuses, now.toISOString()]
+            includeTimeFilter ? [parsedPortId, statuses, now.toISOString()] : [parsedPortId, statuses]
         );
 
         return res.json(result.rows);
@@ -416,9 +441,11 @@ app.put('/bookings/:id/end', async (req, res) => {
             return res.status(400).json({ message: 'Only active bookings can be ended.' });
         }
 
+        const nextStatus = current.type === 'bidirectional' ? 'pending_verification' : 'completed';
+
         const updateResult = await pool.query(
-            "UPDATE bookings SET status = 'completed' WHERE id = $1 AND status = 'active' RETURNING *",
-            [parsedBookingId]
+            'UPDATE bookings SET status = $2 WHERE id = $1 AND status = \'active\' RETURNING *',
+            [parsedBookingId, nextStatus]
         );
 
         if (updateResult.rows.length === 0) {
@@ -428,6 +455,82 @@ app.put('/bookings/:id/end', async (req, res) => {
         return res.json(updateResult.rows[0]);
     } catch (error) {
         console.error('Error ending booking:', error);
+        return res.status(500).json({ message: 'Server error' });
+    }
+});
+
+app.put('/bookings/:id/verification', async (req, res) => {
+    const parsedBookingId = parsePositiveInt(req.params.id);
+    const { verified } = req.body || {};
+
+    if (!parsedBookingId) {
+        return res.status(400).json({ message: 'Invalid booking id.' });
+    }
+
+    if (typeof verified !== 'boolean') {
+        return res.status(400).json({ message: 'verified must be true or false.' });
+    }
+
+    try {
+        const currentResult = await pool.query('SELECT * FROM bookings WHERE id = $1', [parsedBookingId]);
+        if (currentResult.rows.length === 0) {
+            return res.status(404).json({ message: 'Booking not found.' });
+        }
+
+        const current = currentResult.rows[0];
+        if (current.status !== 'pending_verification') {
+            return res.status(400).json({ message: 'Only bookings pending verification can be reviewed.' });
+        }
+
+        if (!verified) {
+            const failedResult = await pool.query(
+                "UPDATE bookings SET status = 'failed' WHERE id = $1 AND status = 'pending_verification' RETURNING *",
+                [parsedBookingId]
+            );
+
+            return res.json(failedResult.rows[0]);
+        }
+
+        let transaction = null;
+        const existingTransaction = await pool.query(
+            'SELECT * FROM v2g_transactions WHERE booking_id = $1 ORDER BY created_at DESC LIMIT 1',
+            [parsedBookingId]
+        );
+
+        if (existingTransaction.rows.length > 0) {
+            transaction = existingTransaction.rows[0];
+        } else {
+            const energy = Number(current.v2g_energy_discharged);
+            const price = Number(current.v2g_price_per_kwh);
+
+            if (!Number.isFinite(energy) || energy <= 0 || !Number.isFinite(price) || price <= 0) {
+                return res.status(400).json({ message: 'Missing V2G pricing information for this booking.' });
+            }
+
+            const payment = energy * price;
+            const txResult = await pool.query(
+                `
+                    INSERT INTO v2g_transactions (booking_id, price_per_kwh, energy_discharged, payment)
+                    VALUES ($1, $2, $3, $4)
+                    RETURNING *
+                `,
+                [parsedBookingId, price, energy, payment]
+            );
+
+            transaction = txResult.rows[0];
+        }
+
+        const confirmedResult = await pool.query(
+            "UPDATE bookings SET status = 'completed' WHERE id = $1 AND status = 'pending_verification' RETURNING *",
+            [parsedBookingId]
+        );
+
+        return res.json({
+            ...confirmedResult.rows[0],
+            v2g_transaction: transaction,
+        });
+    } catch (error) {
+        console.error('Error verifying booking:', error);
         return res.status(500).json({ message: 'Server error' });
     }
 });

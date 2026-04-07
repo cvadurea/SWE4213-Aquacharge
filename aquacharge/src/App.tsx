@@ -9,12 +9,46 @@ import MyBookings from './pages/MyBookings'
 import PortBookings from './pages/PortBookings'
 import MyPort from './pages/MyPort'
 import Profile from './pages/Profile'
+import { Settings } from './pages/Settings.tsx'
+
+const getThemeStorageKey = (user: any) => {
+  if (!user) return null;
+
+  const stableId = user.id || user.email || user.username;
+  if (!stableId) return null;
+
+  return `theme:${String(stableId)}`;
+};
+
+const applyThemeForUser = (user: any) => {
+  const themeKey = getThemeStorageKey(user);
+  const userTheme = themeKey ? localStorage.getItem(themeKey) : null;
+  const fallbackTheme = localStorage.getItem('theme') || 'light';
+  const themeToApply = userTheme || fallbackTheme;
+  document.documentElement.classList.toggle('dark', themeToApply === 'dark');
+};
 
 function App() {
   const [isLogin, setIsLogin] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('token'));
   const [userType, setUserType] = useState<'vessel_owner' | 'port_operator' | null>(null);
   const [currentPage, setCurrentPage] = useState('dashboard');
+
+  useEffect(() => {
+    const rawUser = localStorage.getItem('user');
+    if (!rawUser) {
+      const fallbackTheme = localStorage.getItem('theme') || 'light';
+      document.documentElement.classList.toggle('dark', fallbackTheme === 'dark');
+      return;
+    }
+
+    try {
+      applyThemeForUser(JSON.parse(rawUser));
+    } catch {
+      const fallbackTheme = localStorage.getItem('theme') || 'light';
+      document.documentElement.classList.toggle('dark', fallbackTheme === 'dark');
+    }
+  }, [isLoggedIn]);
 
   useEffect(() => {
     const user = localStorage.getItem('user');
@@ -31,6 +65,7 @@ function App() {
   function onLoginClick(user: any) {
     localStorage.setItem('user', JSON.stringify(user));
     setUserType(user.type);
+    applyThemeForUser(user);
     setIsLoggedIn(true);
   }
 
@@ -74,6 +109,8 @@ function App() {
           return <MyBookings onLogout={onLogout} onNavigate={handleNavigate} />;
         case 'profile':
           return <Profile onLogout={onLogout} onNavigate={handleNavigate} />;
+        case 'settings':
+          return <Settings onLogout={onLogout} onNavigate={handleNavigate} />;
         default:
           return <DashboardVO onLogout={onLogout} onNavigate={handleNavigate} />;
       }
@@ -85,6 +122,8 @@ function App() {
           return <MyPort onLogout={onLogout} onNavigate={handleNavigate} />;
         case 'profile':
           return <Profile onLogout={onLogout} onNavigate={handleNavigate} />;
+        case 'settings':
+          return <Settings onLogout={onLogout} onNavigate={handleNavigate} />;
         default:
           return <DashboardPO onLogout={onLogout} onNavigate={handleNavigate} />;
       }

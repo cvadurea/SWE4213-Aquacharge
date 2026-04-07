@@ -4,7 +4,10 @@ import MetricCard from '@/components/MetricCard';
 import BookingCard from '@/components/BookingCard';
 import { getVONavigation } from '@/lib/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { AlertCircle, Zap, TrendingUp, Calendar } from 'lucide-react';
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
 const BOOKING_API_BASE = 'http://localhost:3003';
 
@@ -27,12 +30,66 @@ interface Booking {
   };
 }
 
+// Demo data initialization (commented out by default).
+// Uncomment this block and the demo toggle inside loadBookingsAndPrice()
+// when you want populated dashboard data without relying on backend state.
+// const DEMO_DASHBOARD_BOOKINGS: Booking[] = [
+//   {
+//     id: 'demo-1',
+//     charger_id: '2',
+//     start_time: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+//     end_time: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 60 * 60 * 1000).toISOString(),
+//     status: 'completed',
+//     type: 'bidirectional',
+//     v2g_transaction: {
+//       energy_discharged: 40,
+//       price_per_kwh: 0.22,
+//       payment: 8.8,
+//     },
+//   },
+//   {
+//     id: 'demo-2',
+//     charger_id: '2',
+//     start_time: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+//     end_time: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 + 75 * 60 * 1000).toISOString(),
+//     status: 'completed',
+//     type: 'bidirectional',
+//     v2g_transaction: {
+//       energy_discharged: 55,
+//       price_per_kwh: 0.21,
+//       payment: 11.55,
+//     },
+//   },
+//   {
+//     id: 'demo-3',
+//     charger_id: '3',
+//     start_time: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000).toISOString(),
+//     end_time: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000 + 90 * 60 * 1000).toISOString(),
+//     status: 'completed',
+//     type: 'bidirectional',
+//     v2g_transaction: {
+//       energy_discharged: 62,
+//       price_per_kwh: 0.2,
+//       payment: 12.4,
+//     },
+//   },
+//   {
+//     id: 'demo-4',
+//     charger_id: '5',
+//     start_time: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+//     end_time: new Date(Date.now() + 26 * 60 * 60 * 1000).toISOString(),
+//     status: 'confirmed',
+//     type: 'regular',
+//   },
+// ];
+
 export default function DashboardVO({ onLogout, onNavigate }: DashboardVOProps) {
   const [user, setUser] = useState<any>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [pricePerKwh, setPricePerKwh] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [chartMode, setChartMode] = useState<'energy' | 'revenue'>('energy');
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -78,6 +135,13 @@ export default function DashboardVO({ onLogout, onNavigate }: DashboardVOProps) 
     try {
       setError('');
       setIsLoading(true);
+
+      // Demo mode toggle (commented out by default).
+      // Uncomment the lines below to bootstrap the dashboard with mock data.
+      // setBookings(DEMO_DASHBOARD_BOOKINGS);
+      // setPricePerKwh(0.22);
+      // setIsLoading(false);
+      // return;
 
       const bookingsPromise = fetch(
         `${BOOKING_API_BASE}/bookings/user/${encodeURIComponent(stored.id)}`,
@@ -142,6 +206,78 @@ export default function DashboardVO({ onLogout, onNavigate }: DashboardVOProps) 
     }, 0);
   }, [bookings]);
 
+  const last30DaysDischargedEnergy = useMemo(() => {
+    const now = Date.now();
+    const cutoff = now - 30 * 24 * 60 * 60 * 1000;
+
+    return bookings.reduce((sum, booking) => {
+      if (!booking.v2g_transaction) return sum;
+
+      const completedAt = new Date(booking.end_time).getTime();
+      if (completedAt < cutoff) return sum;
+
+      const energyDischarged = Number(booking.v2g_transaction.energy_discharged);
+      return sum + (Number.isFinite(energyDischarged) ? energyDischarged : 0);
+    }, 0);
+  }, [bookings]);
+
+  const dischargeChartData = useMemo(() => {
+    const today = new Date();
+    const dayMap = new Map<string, { energy: number; revenue: number }>();
+
+    for (let index = 29; index >= 0; index -= 1) {
+      const date = new Date(today);
+      date.setHours(0, 0, 0, 0);
+      date.setDate(date.getDate() - index);
+      const key = date.toISOString().slice(0, 10);
+      dayMap.set(key, { energy: 0, revenue: 0 });
+    }
+
+    bookings.forEach((booking) => {
+      if (booking.status !== 'completed' || booking.type !== 'bidirectional' || !booking.v2g_transaction) {
+        return;
+      }
+
+      const completedAt = new Date(booking.end_time);
+      if (Number.isNaN(completedAt.getTime())) {
+        return;
+      }
+
+      const key = completedAt.toISOString().slice(0, 10);
+      if (!dayMap.has(key)) {
+        return;
+      }
+
+      const current = dayMap.get(key) || { energy: 0, revenue: 0 };
+      const energy = Number(booking.v2g_transaction.energy_discharged);
+      const payment = Number(booking.v2g_transaction.payment);
+      dayMap.set(key, {
+        energy: current.energy + (Number.isFinite(energy) ? energy : 0),
+        revenue: current.revenue + (Number.isFinite(payment) ? payment : 0),
+      });
+    });
+
+    return Array.from(dayMap.entries()).map(([date, values]) => ({
+      date,
+      label: new Date(`${date}T00:00:00`).toLocaleDateString([], { month: 'short', day: 'numeric' }),
+      energy: values.energy,
+      revenue: values.revenue,
+    }));
+  }, [bookings]);
+
+  const dischargeChartConfig = {
+    energy: {
+      label: 'Energy discharged',
+      color: '#22c55e',
+    },
+    revenue: {
+      label: 'V2G revenue',
+      color: '#f59e0b',
+    },
+  };
+
+  const activeBarColor = chartMode === 'energy' ? '#22c55e' : '#f59e0b';
+
   const navigation = getVONavigation();
 
   return (
@@ -163,13 +299,18 @@ export default function DashboardVO({ onLogout, onNavigate }: DashboardVOProps) 
       )}
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
         <MetricCard
           label="V2G Earnings (Last 30 Days)"
           value={`$${last30DaysEarnings.toFixed(2)}`}
           icon={<TrendingUp className="h-5 w-5 text-accent" />}
           trend="up"
           trendValue="+12% from last month"
+        />
+        <MetricCard
+          label="Discharged Energy (Last 30 Days)"
+          value={`${last30DaysDischargedEnergy.toFixed(1)} kWh`}
+          icon={<Zap className="h-5 w-5 text-secondary" />}
         />
         <MetricCard
           label="Current V2G Price"
@@ -182,6 +323,96 @@ export default function DashboardVO({ onLogout, onNavigate }: DashboardVOProps) 
           icon={<Calendar className="h-5 w-5 text-secondary" />}
         />
       </div>
+
+      <Card className="mb-8">
+        <CardHeader>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <CardTitle>
+                {chartMode === 'energy' ? 'Daily Energy Discharge' : 'Daily V2G Revenue'}
+              </CardTitle>
+              <CardDescription>
+                Interactive bar graph for the last 30 days
+              </CardDescription>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant={chartMode === 'energy' ? 'default' : 'outline'}
+                onClick={() => setChartMode('energy')}
+              >
+                Daily Discharge
+              </Button>
+              <Button
+                size="sm"
+                variant={chartMode === 'revenue' ? 'default' : 'outline'}
+                onClick={() => setChartMode('revenue')}
+              >
+                Daily V2G Revenue
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ChartContainer config={dischargeChartConfig} className="h-[320px] w-full">
+            <BarChart
+              key={`bar-chart-${chartMode}`}
+              data={dischargeChartData}
+              margin={{ top: 12, right: 16, left: 0, bottom: 0 }}
+            >
+              <CartesianGrid vertical={false} strokeDasharray="3 3" />
+              <XAxis
+                dataKey="label"
+                tickLine={false}
+                axisLine={false}
+                interval={2}
+                tickMargin={8}
+              />
+              <YAxis
+                key={`y-axis-${chartMode}`}
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+                width={48}
+                tickFormatter={(value) =>
+                  chartMode === 'revenue'
+                    ? `$${Number(value).toFixed(0)}`
+                    : Number(value).toFixed(0)
+                }
+              />
+              <ChartTooltip
+                cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                content={
+                  <ChartTooltipContent
+                    labelKey="label"
+                    indicator="dot"
+                    formatter={(value) => (
+                      <div className="flex w-full items-center justify-between gap-6">
+                        <span className="text-muted-foreground">
+                          {chartMode === 'energy' ? 'Energy discharged' : 'V2G revenue'}
+                        </span>
+                        <span className="font-mono font-medium tabular-nums">
+                          {chartMode === 'energy'
+                            ? `${Number(value).toFixed(1)} kWh`
+                            : `$${Number(value).toFixed(2)}`}
+                        </span>
+                      </div>
+                    )}
+                  />
+                }
+              />
+              <Bar
+                dataKey={chartMode}
+                fill={activeBarColor}
+                radius={[6, 6, 0, 0]}
+                isAnimationActive
+                animationDuration={650}
+                animationEasing="ease-in-out"
+              />
+            </BarChart>
+          </ChartContainer>
+        </CardContent>
+      </Card>
 
       {/* Next Bookings Section */}
       <Card>

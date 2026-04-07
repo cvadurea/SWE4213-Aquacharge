@@ -293,6 +293,8 @@ export default function FindChargers({ onNavigate, onLogout }: FindChargersProps
     setSelectedCharger(charger);
     setSelectedStartSlot(null);
     setSelectedEndSlot(null);
+    setBookingType(charger.type === 'bidirectional' ? 'bidirectional' : 'regular');
+    setDischargeKwh('');
     setShowCalendar(true);
   };
 
@@ -304,9 +306,10 @@ export default function FindChargers({ onNavigate, onLogout }: FindChargersProps
 
   const handleConfirmBooking = async () => {
     if (selectedCharger && pendingTimeslot) {
+      const normalizedBookingType = selectedCharger.type === 'bidirectional' ? bookingType : 'regular';
       await createBooking(selectedCharger, pendingTimeslot, {
-        booking_type: bookingType,
-        energy_discharged_kwh: bookingType === 'bidirectional' ? parseFloat(dischargeKwh) : undefined,
+        booking_type: normalizedBookingType,
+        energy_discharged_kwh: normalizedBookingType === 'bidirectional' ? parseFloat(dischargeKwh) : undefined,
       });
     }
   };
@@ -693,7 +696,11 @@ export default function FindChargers({ onNavigate, onLogout }: FindChargersProps
           <Card className="w-full max-w-md">
             <CardHeader>
               <CardTitle>Booking Type</CardTitle>
-              <CardDescription>Select the type of booking for charger #{selectedCharger.id}</CardDescription>
+              <CardDescription>
+                {selectedCharger.type === 'bidirectional'
+                  ? `Select the type of booking for charger #${selectedCharger.id}`
+                  : `Regular charging only for charger #${selectedCharger.id}`}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-3">
@@ -714,25 +721,27 @@ export default function FindChargers({ onNavigate, onLogout }: FindChargersProps
                   </div>
                 </label>
 
-                <label className="flex items-center gap-3 p-3 rounded-lg border-2 border-border cursor-pointer hover:bg-muted/50 transition-colors"
-                  onClick={() => setBookingType('bidirectional')}
-                >
-                  <input
-                    type="radio"
-                    name="booking-type"
-                    value="bidirectional"
-                    checked={bookingType === 'bidirectional'}
-                    onChange={(e) => setBookingType(e.target.value)}
-                    className="w-4 h-4"
-                  />
-                  <div>
-                    <p className="font-medium text-foreground">V2G (Discharge)</p>
-                    <p className="text-xs text-muted-foreground">Discharge energy to grid for earnings</p>
-                  </div>
-                </label>
+                {selectedCharger.type === 'bidirectional' && (
+                  <label className="flex items-center gap-3 p-3 rounded-lg border-2 border-border cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => setBookingType('bidirectional')}
+                  >
+                    <input
+                      type="radio"
+                      name="booking-type"
+                      value="bidirectional"
+                      checked={bookingType === 'bidirectional'}
+                      onChange={(e) => setBookingType(e.target.value)}
+                      className="w-4 h-4"
+                    />
+                    <div>
+                      <p className="font-medium text-foreground">V2G (Discharge)</p>
+                      <p className="text-xs text-muted-foreground">Discharge energy to grid for earnings</p>
+                    </div>
+                  </label>
+                )}
               </div>
 
-              {bookingType === 'bidirectional' && (
+              {selectedCharger.type === 'bidirectional' && bookingType === 'bidirectional' && (
                 <Input
                   type="number"
                   placeholder="Energy to discharge (kWh)"

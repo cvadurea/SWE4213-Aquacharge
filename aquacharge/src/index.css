@@ -43,7 +43,7 @@
 }
 
 :root {
-  /* AquaCharge Maritime Tech Theme */
+  /* AquaCharge Light Theme (main content) */
   --primary: #0F4C75;
   --primary-foreground: #F5F7FA;
   --sidebar-primary: #0F4C75;
@@ -54,22 +54,22 @@
   --chart-4: #0F4C75;
   --chart-5: #3282B8;
   --radius: 0.5rem;
-  --background: #1A1F2E;
-  --foreground: #F5F7FA;
-  --card: #2D3142;
-  --card-foreground: #F5F7FA;
-  --popover: #2D3142;
-  --popover-foreground: #F5F7FA;
+  --background: #F3F6FA;
+  --foreground: #1E2A3B;
+  --card: #FFFFFF;
+  --card-foreground: #1E2A3B;
+  --popover: #FFFFFF;
+  --popover-foreground: #1E2A3B;
   --secondary: #3282B8;
   --secondary-foreground: #F5F7FA;
-  --muted: #A8B5C8;
-  --muted-foreground: #A8B5C8;
+  --muted: #E3EAF3;
+  --muted-foreground: #5D6D81;
   --accent: #06A77D;
   --accent-foreground: #F5F7FA;
   --destructive: #E63946;
   --destructive-foreground: #F5F7FA;
-  --border: rgba(255, 255, 255, 0.1);
-  --input: rgba(255, 255, 255, 0.05);
+  --border: rgba(15, 76, 117, 0.15);
+  --input: rgba(15, 76, 117, 0.06);
   --ring: #3282B8;
   --sidebar: #0F4C75;
   --sidebar-foreground: #F5F7FA;
@@ -80,6 +80,7 @@
 }
 
 .dark {
+  /* AquaCharge Dark Theme (main content) */
   --primary: #0F4C75;
   --primary-foreground: #F5F7FA;
   --sidebar-primary: #0F4C75;

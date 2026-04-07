@@ -5,8 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertCircle, Plus, Ship, CheckCircle, Loader2 } from 'lucide-react';
+import { LOCAL_API_BASES } from '@/lib/api';
 
-const FLEET_API_BASE = 'http://localhost:3004';
+const FLEET_API_BASE = LOCAL_API_BASES.fleet;
 
 interface Vessel {
   id: string;

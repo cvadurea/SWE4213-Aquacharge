@@ -5,8 +5,9 @@ import { getVONavigation } from '@/lib/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, Calendar, Zap, Loader2, Filter, CheckCircle2 } from 'lucide-react';
+import { LOCAL_API_BASES } from '@/lib/api';
 
-const BOOKING_API_BASE = 'http://localhost:3003';
+const BOOKING_API_BASE = LOCAL_API_BASES.booking;
 
 interface Booking {
   id: string;

@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, Zap } from 'lucide-react';
+import { LOCAL_API_BASES } from '@/lib/api';
 
 interface LoginProps {
   onLogin: (user: any) => void;
@@ -32,7 +33,7 @@ export default function Login({ onLogin, onSignUpClick }: LoginProps) {
 
     try {
       setIsLoading(true);
-      const response = await fetch('http://localhost:3002/login', {
+      const response = await fetch(`${LOCAL_API_BASES.auth}/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

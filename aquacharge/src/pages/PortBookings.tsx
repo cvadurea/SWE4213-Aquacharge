@@ -4,9 +4,10 @@ import BookingCard from '@/components/BookingCard';
 import { getPONavigation } from '@/lib/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle } from 'lucide-react';
+import { LOCAL_API_BASES } from '@/lib/api';
 
-const BOOKING_API_BASE = 'http://localhost:3003';
-const PORT_API_BASE = 'http://localhost:3006';
+const BOOKING_API_BASE = LOCAL_API_BASES.booking;
+const PORT_API_BASE = LOCAL_API_BASES.port;
 
 interface PortBookingsProps {
   onLogout: () => void;

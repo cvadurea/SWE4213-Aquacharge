@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertCircle, Upload } from 'lucide-react';
+import { LOCAL_API_BASES } from '@/lib/api';
 
-const USER_API_BASE = 'http://localhost:3007';
+const USER_API_BASE = LOCAL_API_BASES.user;
 
 interface ProfileProps {
   onLogout: () => void;

@@ -6,10 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertCircle, MapPin, Zap, Calendar, Loader2, CheckCircle } from 'lucide-react';
+import { LOCAL_API_BASES } from '@/lib/api';
 
-const PORT_API_BASE = 'http://localhost:3006';
-const FLEET_API_BASE = 'http://localhost:3004';
-const BOOKING_API_BASE = 'http://localhost:3003';
+const BOOKING_API_BASE = LOCAL_API_BASES.booking;
+const FLEET_API_BASE = LOCAL_API_BASES.fleet;
+const PORT_API_BASE = LOCAL_API_BASES.port;
 
 interface Port {
   id: string;

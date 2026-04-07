@@ -5,8 +5,9 @@ import BookingCard from '@/components/BookingCard';
 import { getVONavigation } from '@/lib/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle, Zap, TrendingUp, Calendar } from 'lucide-react';
+import { LOCAL_API_BASES } from '@/lib/api';
 
-const BOOKING_API_BASE = 'http://localhost:3003';
+const BOOKING_API_BASE = LOCAL_API_BASES.booking;
 
 interface DashboardVOProps {
   onLogout: () => void;

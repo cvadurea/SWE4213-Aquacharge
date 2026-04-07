@@ -4,8 +4,9 @@ import { getPONavigation } from '@/lib/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, Plus, PlugZap } from 'lucide-react';
+import { LOCAL_API_BASES } from '@/lib/api';
 
-const PORT_API_BASE = 'http://localhost:3006';
+const PORT_API_BASE = LOCAL_API_BASES.port;
 
 interface MyPortProps {
   onLogout: () => void;

@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, Zap, ArrowLeft } from 'lucide-react';
+import { LOCAL_API_BASES } from '@/lib/api';
 
 interface SignupProps {
   onBackToLogin: () => void;
@@ -30,7 +31,7 @@ export default function Signup({ onBackToLogin }: SignupProps) {
 
     try {
       setIsLoading(true);
-      const response = await fetch('http://localhost:3002/register', {
+      const response = await fetch(`${LOCAL_API_BASES.auth}/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -16,6 +16,35 @@ app.use((req, res, next) => {
     next();
 });
 
+// Compatibility shim for older gateway rewrites that strip the /bookings prefix.
+app.use((req, _res, next) => {
+    const method = req.method.toUpperCase();
+    const path = req.path;
+
+    if (method === 'POST' && path === '/') {
+        req.url = `/bookings${req.url}`;
+        return next();
+    }
+
+    if (/^\/user\/\d+$/.test(path) || /^\/port\/\d+$/.test(path)) {
+        req.url = `/bookings${req.url}`;
+        return next();
+    }
+
+    if (/^\/\d+$/.test(path) || /^\/\d+\/(start|end|cancel)$/.test(path)) {
+        req.url = `/bookings${req.url}`;
+        return next();
+    }
+
+    // Handle paths that incorrectly have /bookings prefix (e.g. /bookings/chargers/...)
+    if (/^\/bookings\/(chargers|user|port)\//.test(path)) {
+        req.url = req.url.replace(/^\/bookings/, '');
+        return next();
+    }
+
+    next();
+});
+
 const PORT = 3003;
 
 const pool = new Pool({

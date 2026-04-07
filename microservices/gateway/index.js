@@ -4,58 +4,61 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 const app = express();
 const PORT = 3000;
 
-const VALID_TOKEN = 'token123';
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', process.env.CORS_ORIGIN || '*');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-const authenticate = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Unauthorized', message: 'Missing or invalid Authorization header' });
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
   }
-  const token = authHeader.substring(7); 
-  if (token !== VALID_TOKEN) {
-    return res.status(401).json({ error: 'Unauthorized', message: 'Invalid token' });
-  }
+
   next();
-};
+});
 
-
-app.use('/api/analytics', authenticate, createProxyMiddleware({
-  target: 'http://user-service:3001',
+app.use('/api/analytics', createProxyMiddleware({
+  target: 'http://analytics-service:3001',
   changeOrigin: true,
   pathRewrite: { '^/api/analytics': '/analytics' },
 }));
 
-app.use('/api/auth', authenticate, createProxyMiddleware({
-  target: 'http://user-service:3002',
+app.use('/api/auth', createProxyMiddleware({
+  target: 'http://auth-service:3002',
   changeOrigin: true,
-  pathRewrite: { '^/api/auth': '/auth' },
+  pathRewrite: { '^/api/auth': '' },
 }));
 
-app.use('/api/bookings', authenticate, createProxyMiddleware({
+app.use('/api/bookings', createProxyMiddleware({
   target: 'http://booking-service:3003',
   changeOrigin: true,
   pathRewrite: { '^/api/bookings': '/bookings' },
 }));
 
-app.use('/api/vessels', authenticate, createProxyMiddleware({
-  target: 'http://user-service:3004',
+app.use('/api/vessels', createProxyMiddleware({
+  target: 'http://fleet-service:3004',
   changeOrigin: true,
   pathRewrite: { '^/api/vessels': '/vessels' },
 }));
 
-app.use('/api/notifications', authenticate, createProxyMiddleware({
-  target: 'http://user-service:3005',
+app.use('/api/notifications', createProxyMiddleware({
+  target: 'http://notification-service:3005',
   changeOrigin: true,
   pathRewrite: { '^/api/notifications': '/notifications' },
 }));
 
-app.use('/api/ports', authenticate, createProxyMiddleware({
-  target: 'http://user-service:3006',
+app.use('/api/ports', createProxyMiddleware({
+  target: 'http://port-service:3006',
   changeOrigin: true,
   pathRewrite: { '^/api/ports': '/ports' },
 }));
 
-app.use('/api/users', authenticate, createProxyMiddleware({
+app.use('/api/chargers', createProxyMiddleware({
+  target: 'http://port-service:3006',
+  changeOrigin: true,
+  pathRewrite: { '^/api/chargers': '/chargers' },
+}));
+
+app.use('/api/users', createProxyMiddleware({
   target: 'http://user-service:3007',
   changeOrigin: true,
   pathRewrite: { '^/api/users': '/users' },

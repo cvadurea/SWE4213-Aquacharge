@@ -1,0 +1,22 @@
+# Ignore VCS and editor artifacts
+.git
+.gitignore
+.vscode
+.idea
+
+# Ignore node artifacts
+**/node_modules
+**/npm-debug.log
+**/yarn-error.log
+
+# OS noise
+**/.DS_Store
+**/Thumbs.db
+
+# Build/runtime outputs
+**/dist
+**/build
+**/coverage
+
+# Docker/k8s files not needed in app images
+../k8s

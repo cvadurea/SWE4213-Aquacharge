@@ -6,8 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, Zap, DollarSign, Settings } from 'lucide-react';
+import { LOCAL_API_BASES } from '@/lib/api';
 
-const BOOKING_API_BASE = 'http://localhost:3003';
+const BOOKING_API_BASE = LOCAL_API_BASES.booking;
 
 interface DashboardPOProps {
   onLogout: () => void;

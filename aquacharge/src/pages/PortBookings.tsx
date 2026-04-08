@@ -159,6 +159,16 @@ export default function PortBookings({ onLogout, onNavigate }: PortBookingsProps
     };
 
     loadBookings();
+
+    // Set up auto-refresh every 5 seconds
+    const interval = window.setInterval(() => {
+      setIsLoading(false); // Don't show loading spinner on auto-refresh
+      void loadBookings();
+    }, 5000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
   }, []);
 
   const handleVerification = async (bookingId: string | number, verified: boolean) => {

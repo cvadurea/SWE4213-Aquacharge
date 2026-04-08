@@ -4,7 +4,7 @@ import { getVONavigation } from '@/lib/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { AlertCircle, Plus, Ship, CheckCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Plus, Ship, CheckCircle, Loader2, X, Star, Trash2 } from 'lucide-react';
 
 const FLEET_API_BASE = 'http://localhost:3004';
 
@@ -38,6 +38,12 @@ export default function MyVessels({ onNavigate, onLogout }: MyVesselsProps) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Detail modal state
+  const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [editedVesselName, setEditedVesselName] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const getStoredUser = () => {
     const userData = localStorage.getItem('user');
@@ -182,9 +188,159 @@ export default function MyVessels({ onNavigate, onLogout }: MyVesselsProps) {
     }
   };
 
+  const openDetailModal = (vessel: Vessel) => {
+    setSelectedVessel(vessel);
+    setEditedVesselName(vessel.vessel_name);
+    setIsDetailModalOpen(true);
+  };
+
+  const closeDetailModal = () => {
+    setIsDetailModalOpen(false);
+    setSelectedVessel(null);
+    setEditedVesselName('');
+    setError('');
+  };
+
+  const updateVesselName = async () => {
+    if (!selectedVessel || !editedVesselName.trim()) {
+      setError('Vessel name cannot be empty.');
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError('Missing auth token. Please log in again.');
+      return;
+    }
+
+    try {
+      setIsUpdating(true);
+      setError('');
+
+      const response = await fetch(`${FLEET_API_BASE}/vessels/${selectedVessel.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          vessel_name: editedVesselName.trim(),
+          vessel_model: selectedVessel.vessel_model,
+          registration_number: selectedVessel.registration_number,
+          battery_capacity: selectedVessel.battery_capacity,
+          is_primary: selectedVessel.is_primary,
+        }),
+      });
+
+      const data = await parseResponseBody(response);
+
+      if (!response.ok) {
+        setError(data.message || `Failed to update vessel (HTTP ${response.status}).`);
+        return;
+      }
+
+      setSuccess(`Vessel name updated successfully!`);
+      closeDetailModal();
+      await getVessels();
+    } catch (err) {
+      console.error('Error updating vessel:', err);
+      setError('Could not connect to fleet service.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const setPrimaryVessel = async () => {
+    if (!selectedVessel) return;
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError('Missing auth token. Please log in again.');
+      return;
+    }
+
+    try {
+      setIsUpdating(true);
+      setError('');
+
+      const response = await fetch(`${FLEET_API_BASE}/vessels/${selectedVessel.id}/set-primary`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await parseResponseBody(response);
+
+      if (!response.ok) {
+        setError(data.message || `Failed to set primary vessel (HTTP ${response.status}).`);
+        return;
+      }
+
+      setSuccess(`${selectedVessel.vessel_name} set as primary vessel!`);
+      closeDetailModal();
+      await getVessels();
+    } catch (err) {
+      console.error('Error setting primary vessel:', err);
+      setError('Could not connect to fleet service.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const deleteVessel = async () => {
+    if (!selectedVessel) return;
+
+    if (!confirm(`Are you sure you want to delete "${selectedVessel.vessel_name}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError('Missing auth token. Please log in again.');
+      return;
+    }
+
+    try {
+      setIsUpdating(true);
+      setError('');
+
+      const response = await fetch(`${FLEET_API_BASE}/vessels/${selectedVessel.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const data = await parseResponseBody(response);
+        setError(data.message || `Failed to delete vessel (HTTP ${response.status}).`);
+        return;
+      }
+
+      setSuccess(`Vessel "${selectedVessel.vessel_name}" deleted successfully!`);
+      closeDetailModal();
+      await getVessels();
+    } catch (err) {
+      console.error('Error deleting vessel:', err);
+      setError('Could not connect to fleet service.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   useEffect(() => {
     getVessels();
   }, []);
+
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => setSuccess(''), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [success]);
 
   const navigation = getVONavigation();
 
@@ -244,7 +400,11 @@ export default function MyVessels({ onNavigate, onLogout }: MyVesselsProps) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {vessels.map((vessel) => (
-            <Card key={vessel.id} className="hover:shadow-lg transition-all duration-300">
+            <Card
+              key={vessel.id}
+              onClick={() => openDetailModal(vessel)}
+              className="hover:shadow-lg transition-all duration-300 cursor-pointer hover:border-secondary/50"
+            >
               <CardContent className="pt-6">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
@@ -298,6 +458,121 @@ export default function MyVessels({ onNavigate, onLogout }: MyVesselsProps) {
               </CardContent>
             </Card>
           ))}
+        </div>
+      )}
+
+      {/* Vessel Detail Modal */}
+      {isDetailModalOpen && selectedVessel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-4 border-b border-border">
+              <div className="flex-1">
+                <CardTitle>Vessel Details</CardTitle>
+                <CardDescription>{selectedVessel.registration_number}</CardDescription>
+              </div>
+              <button
+                onClick={closeDetailModal}
+                className="p-1 hover:bg-muted rounded-md transition-colors"
+                aria-label="Close modal"
+              >
+                <X className="h-5 w-5 text-muted-foreground" />
+              </button>
+            </CardHeader>
+            <CardContent className="space-y-6 pt-6">
+              {/* Error Message */}
+              {error && (
+                <div className="flex items-start gap-3 rounded-lg bg-destructive/10 p-4 border border-destructive/20">
+                  <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-destructive">{error}</p>
+                </div>
+              )}
+
+              {/* Vessel Information */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Vessel Name (Edit)
+                  </label>
+                  <Input
+                    value={editedVesselName}
+                    onChange={(e) => setEditedVesselName(e.target.value)}
+                    placeholder="Enter vessel name"
+                    disabled={isUpdating}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Click the save button below to update
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-1">Vessel Model</p>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedVessel.vessel_model || 'Not specified'}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-1">Registration Number</p>
+                  <p className="font-mono text-sm text-muted-foreground">
+                    {selectedVessel.registration_number}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-1">Battery Capacity</p>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedVessel.battery_capacity ? `${selectedVessel.battery_capacity} kWh` : 'Not specified'}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-1">Primary Vessel</p>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedVessel.is_primary ? 'Yes - This is your primary vessel' : 'No - Not set as primary'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-2 pt-6 border-t border-border">
+                <button
+                  onClick={updateVesselName}
+                  disabled={isUpdating || editedVesselName === selectedVessel.vessel_name}
+                  className="w-full px-4 py-2 rounded-lg bg-secondary text-secondary-foreground font-medium hover:bg-secondary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  {isUpdating ? 'Saving...' : 'Save Name Changes'}
+                </button>
+
+                {!selectedVessel.is_primary && (
+                  <button
+                    onClick={setPrimaryVessel}
+                    disabled={isUpdating}
+                    className="w-full px-4 py-2 rounded-lg bg-accent text-accent-foreground font-medium hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-2"
+                  >
+                    <Star className="h-4 w-4" />
+                    {isUpdating ? 'Setting...' : 'Set as Primary Vessel'}
+                  </button>
+                )}
+
+                <button
+                  onClick={deleteVessel}
+                  disabled={isUpdating}
+                  className="w-full px-4 py-2 rounded-lg bg-destructive text-destructive-foreground font-medium hover:bg-destructive/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-2"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {isUpdating ? 'Deleting...' : 'Delete Vessel'}
+                </button>
+
+                <button
+                  onClick={closeDetailModal}
+                  disabled={isUpdating}
+                  className="w-full px-4 py-2 rounded-lg border border-border text-foreground font-medium hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  Close
+                </button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 

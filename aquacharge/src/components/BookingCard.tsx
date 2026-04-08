@@ -109,7 +109,7 @@ export default function BookingCard({
             <div className="flex items-center gap-2 text-sm text-accent font-medium">
               <Zap className="h-4 w-4" />
               <span>
-                {v2gLabel}: {v2gInfo.energyDischarged} kW @ ${Number(v2gInfo.pricePerKwh).toFixed(2)}/kW
+                {v2gLabel}: {v2gInfo.energyDischarged} kWh @ ${Number(v2gInfo.pricePerKwh).toFixed(2)}/kWh
               </span>
             </div>
           </div>

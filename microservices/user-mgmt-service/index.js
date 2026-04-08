@@ -50,7 +50,7 @@ const populateDB = async () => {
     try {
         await pool.query(`
             INSERT INTO users (email, password_hash, first_name, last_name, type) VALUES 
-            ('joseph@example.com', '${hashedPass}', 'Joseph', 'Doe', 'vessel_owner'),
+            ('cvadurea@unb.ca', '${hashedPass}', 'Joseph', 'Doe', 'vessel_owner'),
             ('jane@example.com', '${hashedPass}', 'Jane', 'Smith', 'port_operator')
         `);
         console.log('Sample users inserted');

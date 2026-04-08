@@ -122,6 +122,16 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
     loadBookings();
   }, []);
 
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      void loadBookings();
+    }, 5000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, []);
+
   const handleCancelBooking = async (bookingId: string) => {
     const token = localStorage.getItem('token');
     if (!token) {

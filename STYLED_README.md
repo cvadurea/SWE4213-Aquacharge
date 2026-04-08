@@ -126,7 +126,7 @@ aquacharge-styled/
 The application includes demo accounts for testing:
 
 **Vessel Owner**
-- Email: `joseph@example.com`
+- Email: `cvadurea@unb.ca`
 - Password: `Password1`
 
 **Port Operator**

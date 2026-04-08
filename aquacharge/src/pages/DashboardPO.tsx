@@ -1,26 +1,64 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import MetricCard from '@/components/MetricCard';
 import { getPONavigation } from '@/lib/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, Zap, DollarSign, Settings } from 'lucide-react';
+import { AlertCircle, Zap, DollarSign, Settings, BarChart3 } from 'lucide-react';
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
 const BOOKING_API_BASE = 'http://localhost:3003';
+const PORT_API_BASE = 'http://localhost:3006';
+const FLEET_API_BASE = 'http://localhost:3004';
 
 interface DashboardPOProps {
   onLogout: () => void;
   onNavigate: (page: string) => void;
 }
 
+interface BookingRecord {
+  id: number | string;
+  vessel_id: number | string;
+  end_time: string;
+  status: string;
+  type?: string;
+  v2g_energy_discharged?: number;
+  v2g_price_per_kwh?: number;
+  v2g_transaction?: {
+    energy_discharged?: number;
+    price_per_kwh?: number;
+    payment?: number;
+  };
+}
+
+interface Vessel {
+  id: number;
+  vessel_name: string;
+  registration_number: string;
+}
+
+const toLocalDateKey = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export default function DashboardPO({ onLogout, onNavigate }: DashboardPOProps) {
   const [user, setUser] = useState<any>(null);
+  const [portId, setPortId] = useState<number | null>(null);
   const [pricePerKwh, setPricePerKwh] = useState<number | null>(null);
+  const [completedBookings, setCompletedBookings] = useState<BookingRecord[]>([]);
+  const [vesselsById, setVesselsById] = useState<Record<string, Vessel>>({});
+  const [selectedVesselId, setSelectedVesselId] = useState<string>('all');
+  const [chartMode, setChartMode] = useState<'energy' | 'revenue'>('energy');
   const [newPrice, setNewPrice] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(true);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -42,31 +80,90 @@ export default function DashboardPO({ onLogout, onNavigate }: DashboardPOProps) 
     return { message: text || 'Unexpected response from server' };
   };
 
-  const loadPrice = async () => {
+  const loadDashboardData = async () => {
     try {
       setError('');
-      const response = await fetch(`${BOOKING_API_BASE}/v2g/price`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      const data = await parseResponseBody(response);
-      if (!response.ok) {
-        setError(data.message || `Failed to load V2G price (HTTP ${response.status}).`);
+      setIsLoadingAnalytics(true);
+
+      const stored = localStorage.getItem('user');
+      if (!stored) {
+        setError('Please log in again.');
         return;
       }
-      if (typeof data.price_per_kwh !== 'undefined') {
-        const value = Number(data.price_per_kwh);
+
+      const parsedUser = JSON.parse(stored);
+      const [priceResponse, portsResponse, vesselsResponse] = await Promise.all([
+        fetch(`${BOOKING_API_BASE}/v2g/price`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        }),
+        fetch(`${PORT_API_BASE}/ports`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        }),
+        fetch(`${FLEET_API_BASE}/vessels`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ]);
+
+      const priceData = await parseResponseBody(priceResponse);
+      const portsData = await parseResponseBody(portsResponse);
+      const vesselsData = await parseResponseBody(vesselsResponse);
+
+      if (!priceResponse.ok) {
+        setError(priceData.message || `Failed to load V2G price (HTTP ${priceResponse.status}).`);
+      } else if (typeof priceData.price_per_kwh !== 'undefined') {
+        const value = Number(priceData.price_per_kwh);
         setPricePerKwh(value);
         setNewPrice(value.toFixed(2));
       }
+
+      const matchedPort = Array.isArray(portsData)
+        ? portsData.find((item) => item.owner_email === parsedUser.email)
+        : null;
+
+      if (!matchedPort) {
+        setError('No port found for this account.');
+        setCompletedBookings([]);
+        return;
+      }
+
+      setPortId(Number(matchedPort.id));
+
+      const completedResponse = await fetch(`${BOOKING_API_BASE}/bookings/port/${matchedPort.id}?status=completed`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const completedData = await parseResponseBody(completedResponse);
+
+      if (!completedResponse.ok) {
+        setError(completedData.message || `Failed to load completed bookings (HTTP ${completedResponse.status}).`);
+      } else {
+        setCompletedBookings(Array.isArray(completedData) ? completedData : []);
+      }
+
+      const vesselMap: Record<string, Vessel> = {};
+      if (Array.isArray(vesselsData)) {
+        vesselsData.forEach((vessel) => {
+          vesselMap[String(vessel.id)] = {
+            id: Number(vessel.id),
+            vessel_name: vessel.vessel_name || `Vessel #${vessel.id}`,
+            registration_number: vessel.registration_number || 'N/A',
+          };
+        });
+      }
+      setVesselsById(vesselMap);
     } catch (err) {
-      console.error('Error loading V2G price:', err);
-      setError('Could not connect to booking service.');
+      console.error('Error loading PO dashboard data:', err);
+      setError('Could not connect to services.');
+    } finally {
+      setIsLoadingAnalytics(false);
     }
   };
 
   useEffect(() => {
-    loadPrice();
+    loadDashboardData();
   }, []);
 
   const handleSavePrice = async (event: React.FormEvent) => {
@@ -104,6 +201,124 @@ export default function DashboardPO({ onLogout, onNavigate }: DashboardPOProps) 
 
   const navigation = getPONavigation();
 
+  const vesselOptions = useMemo(() => {
+    const vesselIds = new Set(completedBookings.map((booking) => String(booking.vessel_id)));
+    return Array.from(vesselIds)
+      .map((id) => ({
+        id,
+        label: vesselsById[id]
+          ? `${vesselsById[id].vessel_name} (${vesselsById[id].registration_number})`
+          : `Vessel #${id}`,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [completedBookings, vesselsById]);
+
+  const selectedLabel = selectedVesselId === 'all'
+    ? 'All vessels'
+    : vesselOptions.find((option) => option.id === selectedVesselId)?.label || `Vessel #${selectedVesselId}`;
+
+  const filteredCompletedBookings = useMemo(() => {
+    if (selectedVesselId === 'all') {
+      return completedBookings;
+    }
+
+    return completedBookings.filter((booking) => String(booking.vessel_id) === selectedVesselId);
+  }, [completedBookings, selectedVesselId]);
+
+  const last30DaysEarnings = useMemo(() => {
+    const now = Date.now();
+    const cutoff = now - 30 * 24 * 60 * 60 * 1000;
+
+    return filteredCompletedBookings.reduce((sum, booking) => {
+      const completedAt = new Date(booking.end_time).getTime();
+      if (completedAt < cutoff) return sum;
+
+      const transactionPayment = Number(booking.v2g_transaction?.payment);
+      if (Number.isFinite(transactionPayment) && transactionPayment > 0) {
+        return sum + transactionPayment;
+      }
+
+      const energy = Number(booking.v2g_transaction?.energy_discharged ?? booking.v2g_energy_discharged);
+      const price = Number(booking.v2g_transaction?.price_per_kwh ?? booking.v2g_price_per_kwh);
+      if (!Number.isFinite(energy) || !Number.isFinite(price)) {
+        return sum;
+      }
+
+      return sum + energy * price;
+    }, 0);
+  }, [filteredCompletedBookings]);
+
+  const last30DaysOutput = useMemo(() => {
+    const now = Date.now();
+    const cutoff = now - 30 * 24 * 60 * 60 * 1000;
+
+    return filteredCompletedBookings.reduce((sum, booking) => {
+      const completedAt = new Date(booking.end_time).getTime();
+      if (completedAt < cutoff) return sum;
+
+      const energy = Number(booking.v2g_transaction?.energy_discharged ?? booking.v2g_energy_discharged);
+      return sum + (Number.isFinite(energy) ? energy : 0);
+    }, 0);
+  }, [filteredCompletedBookings]);
+
+  const chartData = useMemo(() => {
+    const today = new Date();
+    const dayMap = new Map<string, { energy: number; revenue: number }>();
+
+    for (let index = 29; index >= 0; index -= 1) {
+      const date = new Date(today);
+      date.setHours(0, 0, 0, 0);
+      date.setDate(date.getDate() - index);
+      const key = toLocalDateKey(date);
+      dayMap.set(key, { energy: 0, revenue: 0 });
+    }
+
+    filteredCompletedBookings.forEach((booking) => {
+      const completedAt = new Date(booking.end_time);
+      if (Number.isNaN(completedAt.getTime())) {
+        return;
+      }
+
+      const key = toLocalDateKey(completedAt);
+      if (!dayMap.has(key)) {
+        return;
+      }
+
+      const energy = Number(booking.v2g_transaction?.energy_discharged ?? booking.v2g_energy_discharged);
+      const payment = Number(booking.v2g_transaction?.payment);
+      const fallbackPrice = Number(booking.v2g_transaction?.price_per_kwh ?? booking.v2g_price_per_kwh);
+      const revenue = Number.isFinite(payment)
+        ? payment
+        : (Number.isFinite(energy) && Number.isFinite(fallbackPrice) ? energy * fallbackPrice : 0);
+
+      const current = dayMap.get(key) || { energy: 0, revenue: 0 };
+      dayMap.set(key, {
+        energy: current.energy + (Number.isFinite(energy) ? energy : 0),
+        revenue: current.revenue + (Number.isFinite(revenue) ? revenue : 0),
+      });
+    });
+
+    return Array.from(dayMap.entries()).map(([date, values]) => ({
+      date,
+      label: new Date(`${date}T00:00:00`).toLocaleDateString([], { month: 'short', day: 'numeric' }),
+      energy: values.energy,
+      revenue: values.revenue,
+    }));
+  }, [filteredCompletedBookings]);
+
+  const chartConfig = {
+    energy: {
+      label: 'Energy output',
+      color: '#22c55e',
+    },
+    revenue: {
+      label: 'Earnings',
+      color: '#f59e0b',
+    },
+  };
+
+  const activeBarColor = chartMode === 'energy' ? '#22c55e' : '#f59e0b';
+
   return (
     <DashboardLayout
       title={`Welcome, ${user?.first_name || 'Port Operator'}`}
@@ -114,7 +329,6 @@ export default function DashboardPO({ onLogout, onNavigate }: DashboardPOProps) 
       onNavigate={onNavigate}
       userType="port_operator"
     >
-      {/* Error Message */}
       {error && (
         <div className="mb-6 flex items-start gap-3 rounded-lg bg-destructive/10 p-4 border border-destructive/20">
           <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
@@ -122,7 +336,6 @@ export default function DashboardPO({ onLogout, onNavigate }: DashboardPOProps) 
         </div>
       )}
 
-      {/* Success Message */}
       {success && (
         <div className="mb-6 flex items-start gap-3 rounded-lg bg-accent/10 p-4 border border-accent/20">
           <Zap className="h-5 w-5 text-accent flex-shrink-0 mt-0.5" />
@@ -130,12 +343,21 @@ export default function DashboardPO({ onLogout, onNavigate }: DashboardPOProps) 
         </div>
       )}
 
-      {/* Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
         <MetricCard
           label="Current V2G Discharge Price"
           value={pricePerKwh != null ? `$${pricePerKwh.toFixed(2)} / kW` : '—'}
           icon={<DollarSign className="h-5 w-5 text-secondary" />}
+        />
+        <MetricCard
+          label={`${selectedLabel} Earnings (30 Days)`}
+          value={`$${last30DaysEarnings.toFixed(2)}`}
+          icon={<DollarSign className="h-5 w-5 text-accent" />}
+        />
+        <MetricCard
+          label={`${selectedLabel} Output (30 Days)`}
+          value={`${last30DaysOutput.toFixed(1)} kWh`}
+          icon={<Zap className="h-5 w-5 text-secondary" />}
         />
         <MetricCard
           label="System Status"
@@ -144,7 +366,118 @@ export default function DashboardPO({ onLogout, onNavigate }: DashboardPOProps) 
         />
       </div>
 
-      {/* Price Management Card */}
+      <Card className="mb-8">
+        <CardHeader>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                {chartMode === 'energy' ? '30-Day Energy Output' : '30-Day Earnings'}
+              </CardTitle>
+              <CardDescription>
+                View totals across all vessels or filter to a single vessel
+              </CardDescription>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant={chartMode === 'energy' ? 'default' : 'outline'}
+                onClick={() => setChartMode('energy')}
+              >
+                Output
+              </Button>
+              <Button
+                size="sm"
+                variant={chartMode === 'revenue' ? 'default' : 'outline'}
+                onClick={() => setChartMode('revenue')}
+              >
+                Earnings
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2 pt-2">
+            <Button
+              size="sm"
+              variant={selectedVesselId === 'all' ? 'default' : 'outline'}
+              onClick={() => setSelectedVesselId('all')}
+            >
+              Total (All Vessels)
+            </Button>
+            {vesselOptions.map((option) => (
+              <Button
+                key={option.id}
+                size="sm"
+                variant={selectedVesselId === option.id ? 'default' : 'outline'}
+                onClick={() => setSelectedVesselId(option.id)}
+              >
+                {option.label}
+              </Button>
+            ))}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoadingAnalytics ? (
+            <p className="text-sm text-muted-foreground">Loading analytics...</p>
+          ) : (
+            <ChartContainer config={chartConfig} className="h-[320px] w-full">
+              <BarChart
+                key={`po-chart-${chartMode}-${selectedVesselId}`}
+                data={chartData}
+                margin={{ top: 12, right: 16, left: 0, bottom: 0 }}
+              >
+                <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="label"
+                  tickLine={false}
+                  axisLine={false}
+                  interval={2}
+                  tickMargin={8}
+                />
+                <YAxis
+                  key={`po-y-axis-${chartMode}`}
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  width={48}
+                  tickFormatter={(value) =>
+                    chartMode === 'revenue'
+                      ? `$${Number(value).toFixed(0)}`
+                      : Number(value).toFixed(0)
+                  }
+                />
+                <ChartTooltip
+                  cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                  content={
+                    <ChartTooltipContent
+                      labelKey="label"
+                      indicator="dot"
+                      formatter={(value) => (
+                        <div className="flex w-full items-center justify-between gap-6">
+                          <span className="text-muted-foreground">
+                            {chartMode === 'energy' ? 'Energy output' : 'Earnings'}
+                          </span>
+                          <span className="font-mono font-medium tabular-nums">
+                            {chartMode === 'energy'
+                              ? `${Number(value).toFixed(1)} kWh`
+                              : `$${Number(value).toFixed(2)}`}
+                          </span>
+                        </div>
+                      )}
+                    />
+                  }
+                />
+                <Bar
+                  dataKey={chartMode === 'energy' ? 'energy' : 'revenue'}
+                  fill={activeBarColor}
+                  radius={[6, 6, 0, 0]}
+                />
+              </BarChart>
+            </ChartContainer>
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -195,10 +528,9 @@ export default function DashboardPO({ onLogout, onNavigate }: DashboardPOProps) 
         </CardContent>
       </Card>
 
-      {/* Additional Info */}
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle>Quick Links</CardTitle>
+          <CardTitle>Quick Links {portId ? `for Port #${portId}` : ''}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           <button

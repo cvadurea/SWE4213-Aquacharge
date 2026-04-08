@@ -41,6 +41,16 @@ export default function BookingCard({
     failed: 'destructive' as const,
   };
 
+  const statusClass = {
+    confirmed: '',
+    pending: '',
+    active: '',
+    completed: 'bg-green-100 text-green-700 border-green-200 hover:bg-green-100',
+    cancelled: '',
+    pending_verification: '',
+    failed: '',
+  } as const;
+
   const formatStatus = (value: BookingStatus) => {
     return value
       .replace(/_/g, ' ')
@@ -78,7 +88,7 @@ export default function BookingCard({
               Charger {chargerId}
             </p>
           </div>
-          <Badge variant={statusVariant[status] as any}>
+          <Badge variant={statusVariant[status] as any} className={statusClass[status]}>
             {formatStatus(status)}
           </Badge>
         </div>

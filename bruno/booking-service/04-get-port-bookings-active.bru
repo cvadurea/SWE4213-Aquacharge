@@ -1,0 +1,17 @@
+meta {
+  name: Get Port Bookings Active
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{booking_base}}/bookings/port/1?status=active
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

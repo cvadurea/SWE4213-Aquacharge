@@ -1,0 +1,27 @@
+meta {
+  name: Update V2G Price
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{booking_base}}/v2g/price
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "price_per_kwh": 0.25
+  }
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

@@ -1,0 +1,17 @@
+meta {
+  name: Get Charger Timeslots
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{booking_base}}/chargers/1/timeslots?start_date=2026-04-07T00:00:00.000Z&end_date=2026-04-08T00:00:00.000Z
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

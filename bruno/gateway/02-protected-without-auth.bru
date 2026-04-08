@@ -1,0 +1,21 @@
+meta {
+  name: Protected Route With Auth
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{gateway_base}}/api/bookings/port/1?status=active
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{gateway_token}}
+}
+
+tests {
+  test("status is not 401", function() {
+    expect(res.getStatus()).to.not.equal(401);
+  });
+}

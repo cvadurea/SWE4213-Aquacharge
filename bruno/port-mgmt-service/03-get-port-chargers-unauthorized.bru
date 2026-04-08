@@ -1,0 +1,21 @@
+meta {
+  name: Get Port Chargers Authenticated
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{port_base}}/ports/1/chargers
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt_token}}
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

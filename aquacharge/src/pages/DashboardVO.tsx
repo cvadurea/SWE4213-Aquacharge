@@ -23,6 +23,8 @@ interface Booking {
   end_time: string;
   status: string;
   type: string;
+  v2g_energy_discharged?: number;
+  v2g_price_per_kwh?: number;
   v2g_transaction?: {
     energy_discharged: number;
     price_per_kwh: number;
@@ -36,6 +38,13 @@ interface UserNotification {
   message: string;
   created_at: string;
 }
+
+const toLocalDateKey = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 // Demo data initialization (commented out by default).
 // Uncomment this block and the demo toggle inside loadBookingsAndPrice()
@@ -297,6 +306,16 @@ export default function DashboardVO({ onLogout, onNavigate }: DashboardVOProps) 
     loadBookingsAndPrice();
   }, []);
 
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      void loadBookingsAndPrice();
+    }, 30000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, []);
+
   const upcomingBookings = useMemo(() => {
     const now = Date.now();
     return bookings
@@ -308,12 +327,25 @@ export default function DashboardVO({ onLogout, onNavigate }: DashboardVOProps) 
   const last30DaysEarnings = useMemo(() => {
     const now = Date.now();
     const cutoff = now - 30 * 24 * 60 * 60 * 1000;
+
     return bookings.reduce((sum, b) => {
-      if (!b.v2g_transaction) return sum;
-      const createdAt = new Date(b.v2g_transaction?.payment ? b.start_time : b.start_time).getTime();
-      if (createdAt < cutoff) return sum;
-      const payment = Number(b.v2g_transaction.payment);
-      return sum + (Number.isFinite(payment) ? payment : 0);
+      if (b.status !== 'completed' || b.type !== 'bidirectional') return sum;
+
+      const completedAt = new Date(b.end_time).getTime();
+      if (completedAt < cutoff) return sum;
+
+      const payment = Number(b.v2g_transaction?.payment);
+      if (Number.isFinite(payment)) {
+        return sum + payment;
+      }
+
+      const fallbackEnergy = Number(b.v2g_energy_discharged);
+      const fallbackPrice = Number(b.v2g_price_per_kwh);
+      if (Number.isFinite(fallbackEnergy) && Number.isFinite(fallbackPrice)) {
+        return sum + (fallbackEnergy * fallbackPrice);
+      }
+
+      return sum;
     }, 0);
   }, [bookings]);
 
@@ -322,12 +354,12 @@ export default function DashboardVO({ onLogout, onNavigate }: DashboardVOProps) 
     const cutoff = now - 30 * 24 * 60 * 60 * 1000;
 
     return bookings.reduce((sum, booking) => {
-      if (!booking.v2g_transaction) return sum;
+      if (booking.status !== 'completed' || booking.type !== 'bidirectional') return sum;
 
       const completedAt = new Date(booking.end_time).getTime();
       if (completedAt < cutoff) return sum;
 
-      const energyDischarged = Number(booking.v2g_transaction.energy_discharged);
+      const energyDischarged = Number(booking.v2g_transaction?.energy_discharged ?? booking.v2g_energy_discharged);
       return sum + (Number.isFinite(energyDischarged) ? energyDischarged : 0);
     }, 0);
   }, [bookings]);
@@ -340,12 +372,12 @@ export default function DashboardVO({ onLogout, onNavigate }: DashboardVOProps) 
       const date = new Date(today);
       date.setHours(0, 0, 0, 0);
       date.setDate(date.getDate() - index);
-      const key = date.toISOString().slice(0, 10);
+      const key = toLocalDateKey(date);
       dayMap.set(key, { energy: 0, revenue: 0 });
     }
 
     bookings.forEach((booking) => {
-      if (booking.status !== 'completed' || booking.type !== 'bidirectional' || !booking.v2g_transaction) {
+      if (booking.status !== 'completed' || booking.type !== 'bidirectional') {
         return;
       }
 
@@ -354,17 +386,22 @@ export default function DashboardVO({ onLogout, onNavigate }: DashboardVOProps) 
         return;
       }
 
-      const key = completedAt.toISOString().slice(0, 10);
+      const key = toLocalDateKey(completedAt);
       if (!dayMap.has(key)) {
         return;
       }
 
       const current = dayMap.get(key) || { energy: 0, revenue: 0 };
-      const energy = Number(booking.v2g_transaction.energy_discharged);
-      const payment = Number(booking.v2g_transaction.payment);
+      const energy = Number(booking.v2g_transaction?.energy_discharged ?? booking.v2g_energy_discharged);
+      const payment = Number(booking.v2g_transaction?.payment);
+      const fallbackPrice = Number(booking.v2g_transaction?.price_per_kwh ?? booking.v2g_price_per_kwh);
+      const revenue = Number.isFinite(payment)
+        ? payment
+        : (Number.isFinite(energy) && Number.isFinite(fallbackPrice) ? energy * fallbackPrice : 0);
+
       dayMap.set(key, {
         energy: current.energy + (Number.isFinite(energy) ? energy : 0),
-        revenue: current.revenue + (Number.isFinite(payment) ? payment : 0),
+        revenue: current.revenue + (Number.isFinite(revenue) ? revenue : 0),
       });
     });
 

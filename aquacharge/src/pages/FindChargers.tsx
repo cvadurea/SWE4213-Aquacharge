@@ -48,6 +48,23 @@ interface FindChargersProps {
   onLogout: () => void;
 }
 
+const formatLocalDateInput = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getLocalTimezoneLabel = () => {
+  try {
+    const parts = new Intl.DateTimeFormat([], { timeZoneName: 'short' }).formatToParts(new Date());
+    const tz = parts.find((part) => part.type === 'timeZoneName')?.value;
+    return tz || 'local time';
+  } catch {
+    return 'local time';
+  }
+};
+
 export default function FindChargers({ onNavigate, onLogout }: FindChargersProps) {
   const [ports, setPorts] = useState<Port[]>([]);
   const [vessels, setVessels] = useState<Vessel[]>([]);
@@ -57,7 +74,7 @@ export default function FindChargers({ onNavigate, onLogout }: FindChargersProps
   const [selectedCharger, setSelectedCharger] = useState<Charger | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
   const [pendingTimeslot, setPendingTimeslot] = useState<Timeslot | null>(null);
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [selectedDate, setSelectedDate] = useState(() => formatLocalDateInput(new Date()));
   const [timeslots, setTimeslots] = useState<AvailabilityTimeslot[]>([]);
   const [isTimeslotsLoading, setIsTimeslotsLoading] = useState(false);
   const [selectedStartSlot, setSelectedStartSlot] = useState<AvailabilityTimeslot | null>(null);
@@ -377,7 +394,11 @@ export default function FindChargers({ onNavigate, onLogout }: FindChargersProps
 
   const formatSlotTime = (iso: string) => {
     const date = new Date(iso);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZoneName: 'short',
+    });
   };
 
   const getSlotIndex = (slot: AvailabilityTimeslot | null) => {
@@ -616,13 +637,16 @@ export default function FindChargers({ onNavigate, onLogout }: FindChargersProps
                   <Input
                     type="date"
                     value={selectedDate}
-                    min={new Date().toISOString().slice(0, 10)}
+                    min={formatLocalDateInput(new Date())}
                     onChange={(e) => {
                       setSelectedDate(e.target.value);
                       setSelectedStartSlot(null);
                       setSelectedEndSlot(null);
                     }}
                   />
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Timeslots are shown in your local timezone ({getLocalTimezoneLabel()}).
+                  </p>
                 </div>
               </div>
 

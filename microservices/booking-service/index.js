@@ -555,15 +555,23 @@ app.get('/bookings/port/:port_id', async (req, res) => {
     }
 
     try {
-        const timeClause = includeTimeFilter ? 'AND end_time > $3' : '';
+        const timeClause = includeTimeFilter ? 'AND b.end_time > $3' : '';
         const result = await pool.query(
             `
-                SELECT *
-                FROM bookings
-                WHERE port_id = $1
-                  AND status = ANY($2)
+                SELECT
+                    b.*,
+                    (
+                        SELECT row_to_json(t)
+                        FROM v2g_transactions t
+                        WHERE t.booking_id = b.id
+                        ORDER BY t.created_at DESC
+                        LIMIT 1
+                    ) AS v2g_transaction
+                FROM bookings b
+                WHERE b.port_id = $1
+                  AND b.status = ANY($2)
                   ${timeClause}
-                ORDER BY start_time ASC
+                ORDER BY b.start_time ASC
             `,
             includeTimeFilter ? [parsedPortId, statuses, now.toISOString()] : [parsedPortId, statuses]
         );

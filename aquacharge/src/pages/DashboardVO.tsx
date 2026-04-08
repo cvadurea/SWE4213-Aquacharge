@@ -5,7 +5,7 @@ import BookingCard from '@/components/BookingCard';
 import { getVONavigation } from '@/lib/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, Zap, TrendingUp, Calendar, Bell } from 'lucide-react';
+import { AlertCircle, Zap, TrendingUp, Calendar, Bell, RefreshCw, Clock } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
@@ -110,6 +110,7 @@ export default function DashboardVO({ onLogout, onNavigate }: DashboardVOProps) 
   const [isMarkingNotifications, setIsMarkingNotifications] = useState(false);
   const [dismissingNotificationId, setDismissingNotificationId] = useState<number | null>(null);
   const [chartMode, setChartMode] = useState<'energy' | 'revenue'>('energy');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -302,6 +303,12 @@ export default function DashboardVO({ onLogout, onNavigate }: DashboardVOProps) 
     }
   };
 
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    await loadBookingsAndPrice();
+    setIsRefreshing(false);
+  };
+
   useEffect(() => {
     loadBookingsAndPrice();
   }, []);
@@ -309,7 +316,7 @@ export default function DashboardVO({ onLogout, onNavigate }: DashboardVOProps) 
   useEffect(() => {
     const interval = window.setInterval(() => {
       void loadBookingsAndPrice();
-    }, 30000);
+    }, 5000);
 
     return () => {
       window.clearInterval(interval);
@@ -413,6 +420,10 @@ export default function DashboardVO({ onLogout, onNavigate }: DashboardVOProps) 
     }));
   }, [bookings]);
 
+  const pendingVerificationBookings = useMemo(() => {
+    return bookings.filter((b) => b.type === 'bidirectional' && b.status === 'pending_verification');
+  }, [bookings]);
+
   const dischargeChartConfig = {
     energy: {
       label: 'Energy discharged',
@@ -445,6 +456,26 @@ export default function DashboardVO({ onLogout, onNavigate }: DashboardVOProps) 
           <p className="text-sm text-destructive">{error}</p>
         </div>
       )}
+
+      {/* Refresh Button and Pending Verification Section */}
+      <div className="mb-6 flex items-center justify-between">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleManualRefresh}
+          disabled={isRefreshing}
+          className="gap-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          {isRefreshing ? 'Refreshing...' : 'Refresh Now'}
+        </Button>
+        {pendingVerificationBookings.length > 0 && (
+          <div className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            {pendingVerificationBookings.length} bidirectional booking{pendingVerificationBookings.length !== 1 ? 's' : ''} awaiting port operator verification
+          </div>
+        )}
+      </div>
 
       <Card className="mb-6">
         <CardHeader>
@@ -520,7 +551,7 @@ export default function DashboardVO({ onLogout, onNavigate }: DashboardVOProps) 
         />
         <MetricCard
           label="Current V2G Price"
-          value={pricePerKwh != null ? `$${pricePerKwh.toFixed(2)} / kW` : '—'}
+          value={pricePerKwh != null ? `$${pricePerKwh.toFixed(2)} / kWh` : '—'}
           icon={<Zap className="h-5 w-5 text-secondary" />}
         />
         <MetricCard
@@ -619,6 +650,60 @@ export default function DashboardVO({ onLogout, onNavigate }: DashboardVOProps) 
           </ChartContainer>
         </CardContent>
       </Card>
+
+      {/* Pending Verification Bookings Section */}
+      {pendingVerificationBookings.length > 0 && (
+        <Card className="mb-8 border-amber-200 bg-amber-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-amber-900">
+              <Clock className="h-5 w-5" />
+              Pending Verification ({pendingVerificationBookings.length})
+            </CardTitle>
+            <CardDescription>
+              These bidirectional bookings are waiting for port operator verification before earnings are finalized
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {pendingVerificationBookings.map((b) => {
+                const estimatedEnergy = Number(b.v2g_energy_discharged || 0);
+                const estimatedPrice = Number(b.v2g_price_per_kwh || pricePerKwh || 0);
+                const estimatedEarnings = estimatedEnergy * estimatedPrice;
+                return (
+                  <div key={b.id} className="p-4 border border-amber-200 rounded-lg bg-white">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <p className="font-semibold text-foreground">Booking #{b.id}</p>
+                        <p className="text-xs text-muted-foreground">Charger {b.charger_id}</p>
+                      </div>
+                      <span className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800">
+                        Verifying
+                      </span>
+                    </div>
+                    <div className="space-y-2 border-t border-amber-100 pt-3">
+                      {estimatedEnergy > 0 && (
+                        <>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Energy:</span>
+                            <span className="font-medium">{estimatedEnergy.toFixed(2)} kWh</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Est. Earnings:</span>
+                            <span className="font-medium text-amber-700">${estimatedEarnings.toFixed(2)}</span>
+                          </div>
+                        </>
+                      )}
+                      <p className="text-xs text-amber-700 mt-3 italic">
+                        Will be added to your earnings once verified by the port operator
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Next Bookings Section */}
       <Card>

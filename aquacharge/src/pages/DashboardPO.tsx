@@ -166,6 +166,16 @@ export default function DashboardPO({ onLogout, onNavigate }: DashboardPOProps) 
     loadDashboardData();
   }, []);
 
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      void loadDashboardData();
+    }, 5000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, []);
+
   const handleSavePrice = async (event: React.FormEvent) => {
     event.preventDefault();
     const parsed = Number(newPrice);
@@ -346,7 +356,7 @@ export default function DashboardPO({ onLogout, onNavigate }: DashboardPOProps) 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
         <MetricCard
           label="Current V2G Discharge Price"
-          value={pricePerKwh != null ? `$${pricePerKwh.toFixed(2)} / kW` : '—'}
+          value={pricePerKwh != null ? `$${pricePerKwh.toFixed(2)} / kWh` : '—'}
           icon={<DollarSign className="h-5 w-5 text-secondary" />}
         />
         <MetricCard

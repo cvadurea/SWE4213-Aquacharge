@@ -95,6 +95,17 @@ const initDB = async () => {
             );
         `);
 
+        // Initialize v2g_settings with default price if no price exists
+        const priceCheck = await pool.query('SELECT COUNT(*) as count FROM v2g_settings');
+        if (priceCheck.rows[0].count === 0) {
+            const defaultPrice = Number(process.env.V2G_PRICE_PER_KWH || '0.20');
+            await pool.query(
+                'INSERT INTO v2g_settings (price_per_kwh) VALUES ($1)',
+                [defaultPrice]
+            );
+            console.log(`V2G settings initialized with default price: $${defaultPrice.toFixed(2)}/kWh`);
+        }
+
         console.log('Bookings table initialized');
     } catch (error) {
         console.error('Error initializing bookings database:', error);
@@ -263,7 +274,23 @@ app.post('/bookings', async (req, res) => {
                 return res.status(400).json({ message: 'energy_discharged_kwh must be a positive number for bidirectional bookings.' });
             }
             energyKwh = parsedEnergy;
-            pricePerKwh = Number(process.env.V2G_PRICE_PER_KWH || '0.20');
+            
+            // Fetch current V2G price from database
+            const priceResult = await pool.query(
+                'SELECT price_per_kwh FROM v2g_settings ORDER BY updated_at DESC LIMIT 1'
+            );
+            
+            if (priceResult.rows.length > 0) {
+                const dbPrice = Number(priceResult.rows[0].price_per_kwh);
+                if (Number.isFinite(dbPrice) && dbPrice > 0) {
+                    pricePerKwh = dbPrice;
+                }
+            }
+            
+            // Fallback to environment variable if no price set in database
+            if (pricePerKwh === null) {
+                pricePerKwh = Number(process.env.V2G_PRICE_PER_KWH || '0.20');
+            }
         }
 
         const overlapResult = await pool.query(

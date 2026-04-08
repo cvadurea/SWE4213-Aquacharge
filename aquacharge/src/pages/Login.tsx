@@ -139,7 +139,7 @@ export default function Login({ onLogin, onSignUpClick }: LoginProps) {
                 type="button"
                 variant="outline"
                 className="w-full"
-                onClick={() => fillTestUser('joseph@example.com', 'Password1')}
+                onClick={() => fillTestUser('cvadurea@unb.ca', 'Password1')}
                 disabled={isLoading}
               >
                 Vessel Owner Demo

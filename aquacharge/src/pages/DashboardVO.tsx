@@ -5,7 +5,7 @@ import BookingCard from '@/components/BookingCard';
 import { getVONavigation } from '@/lib/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, Zap, TrendingUp, Calendar } from 'lucide-react';
+import { AlertCircle, Zap, TrendingUp, Calendar, Bell } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
@@ -28,6 +28,13 @@ interface Booking {
     price_per_kwh: number;
     payment: number;
   };
+}
+
+interface UserNotification {
+  id: number;
+  title: string;
+  message: string;
+  created_at: string;
 }
 
 // Demo data initialization (commented out by default).
@@ -87,8 +94,12 @@ export default function DashboardVO({ onLogout, onNavigate }: DashboardVOProps) 
   const [user, setUser] = useState<any>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [pricePerKwh, setPricePerKwh] = useState<number | null>(null);
+  const [notifications, setNotifications] = useState<UserNotification[]>([]);
   const [error, setError] = useState('');
+  const [notificationError, setNotificationError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isMarkingNotifications, setIsMarkingNotifications] = useState(false);
+  const [dismissingNotificationId, setDismissingNotificationId] = useState<number | null>(null);
   const [chartMode, setChartMode] = useState<'energy' | 'revenue'>('energy');
 
   useEffect(() => {
@@ -161,9 +172,25 @@ export default function DashboardVO({ onLogout, onNavigate }: DashboardVOProps) 
         },
       });
 
-      const [bookingsRes, priceRes] = await Promise.all([bookingsPromise, pricePromise]);
+      const notificationsPromise = fetch(
+        `${BOOKING_API_BASE}/notifications/user/${encodeURIComponent(stored.id)}?unreadOnly=true&limit=5`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const [bookingsRes, priceRes, notificationsRes] = await Promise.all([
+        bookingsPromise,
+        pricePromise,
+        notificationsPromise,
+      ]);
       const bookingsData = await parseResponseBody(bookingsRes);
       const priceData = await parseResponseBody(priceRes);
+      const notificationsData = await parseResponseBody(notificationsRes);
 
       if (!bookingsRes.ok) {
         setError(bookingsData.message || `Failed to fetch bookings (HTTP ${bookingsRes.status}).`);
@@ -174,11 +201,95 @@ export default function DashboardVO({ onLogout, onNavigate }: DashboardVOProps) 
       if (priceRes.ok && typeof priceData.price_per_kwh !== 'undefined') {
         setPricePerKwh(Number(priceData.price_per_kwh));
       }
+
+      if (notificationsRes.ok) {
+        setNotifications(Array.isArray(notificationsData) ? notificationsData : []);
+        setNotificationError('');
+      } else {
+        setNotificationError(
+          notificationsData.message || `Failed to load notifications (HTTP ${notificationsRes.status}).`
+        );
+      }
     } catch (err) {
       console.error('Error loading dashboard data:', err);
       setError('Could not connect to booking service.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const markNotificationsAsRead = async () => {
+    const stored = getStoredUser();
+    const token = localStorage.getItem('token');
+
+    if (!stored?.id || !token || notifications.length === 0) {
+      return;
+    }
+
+    try {
+      setIsMarkingNotifications(true);
+      const response = await fetch(
+        `${BOOKING_API_BASE}/notifications/user/${encodeURIComponent(stored.id)}/read-all`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const data = await parseResponseBody(response);
+        setNotificationError(data.message || `Failed to mark notifications as read (HTTP ${response.status}).`);
+        return;
+      }
+
+      setNotifications([]);
+      setNotificationError('');
+    } catch (err) {
+      console.error('Error marking notifications as read:', err);
+      setNotificationError('Could not update notification state.');
+    } finally {
+      setIsMarkingNotifications(false);
+    }
+  };
+
+  const dismissNotification = async (notificationId: number) => {
+    const stored = getStoredUser();
+    const token = localStorage.getItem('token');
+
+    if (!stored?.id || !token) {
+      setNotificationError('Missing auth information. Please log in again.');
+      return;
+    }
+
+    try {
+      setDismissingNotificationId(notificationId);
+      const response = await fetch(
+        `${BOOKING_API_BASE}/notifications/user/${encodeURIComponent(stored.id)}/${encodeURIComponent(String(notificationId))}/read`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const data = await parseResponseBody(response);
+        setNotificationError(data.message || `Failed to dismiss notification (HTTP ${response.status}).`);
+        return;
+      }
+
+      setNotifications((prev) => prev.filter((notification) => notification.id !== notificationId));
+      setNotificationError('');
+    } catch (err) {
+      console.error('Error dismissing notification:', err);
+      setNotificationError('Could not dismiss notification.');
+    } finally {
+      setDismissingNotificationId(null);
     }
   };
 
@@ -297,6 +408,64 @@ export default function DashboardVO({ onLogout, onNavigate }: DashboardVOProps) 
           <p className="text-sm text-destructive">{error}</p>
         </div>
       )}
+
+      <Card className="mb-6">
+        <CardHeader>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-5 w-5 text-secondary" />
+                Notifications
+              </CardTitle>
+              <CardDescription>
+                Alerts about V2G price changes from port operators
+              </CardDescription>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={notifications.length === 0 || isMarkingNotifications}
+              onClick={markNotificationsAsRead}
+            >
+              {isMarkingNotifications ? 'Marking...' : 'Mark all as read'}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {notificationError && (
+            <p className="text-sm text-destructive mb-3">{notificationError}</p>
+          )}
+          {notifications.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No new notifications.</p>
+          ) : (
+            <div className="space-y-3">
+              {notifications.map((notification) => (
+                <div key={notification.id} className="rounded-lg border border-border bg-muted/30 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">{notification.title}</p>
+                      <p className="text-sm text-muted-foreground">{notification.message}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {new Date(notification.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      aria-label="Dismiss notification"
+                      disabled={dismissingNotificationId === notification.id}
+                      onClick={() => dismissNotification(notification.id)}
+                      className="text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold"
+                    >
+                      {dismissingNotificationId === notification.id ? '...' : 'x'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">

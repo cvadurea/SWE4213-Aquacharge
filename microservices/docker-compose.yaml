@@ -62,6 +62,7 @@ services:
       DB_PASSWORD: postgres
       JWT_SECRET: "bwf8734tir87y2o83dyro94jo192o9sy1j8734ytrjm192y9efh879s1y379"
       NOTIFICATION_SERVICE_URL: http://notification-service:3005
+      USER_SERVICE_URL: http://user-service:3007
     depends_on:
       - booking-db
     networks:

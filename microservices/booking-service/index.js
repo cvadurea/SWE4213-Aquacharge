@@ -18,6 +18,7 @@ app.use((req, res, next) => {
 
 const PORT = 3003;
 const NOTIFICATION_SERVICE_URL = process.env.NOTIFICATION_SERVICE_URL || 'http://notification-service:3005';
+const USER_SERVICE_URL = process.env.USER_SERVICE_URL || 'http://user-service:3007';
 
 const pool = new Pool({
     host: process.env.DB_HOST || 'booking-db',
@@ -81,6 +82,19 @@ const initDB = async () => {
             );
         `);
 
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS user_notifications (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                type VARCHAR(50) NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                message TEXT NOT NULL,
+                metadata JSONB,
+                is_read BOOLEAN NOT NULL DEFAULT FALSE,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+        `);
+
         console.log('Bookings table initialized');
     } catch (error) {
         console.error('Error initializing bookings database:', error);
@@ -107,6 +121,76 @@ const parsePositiveInt = (value) => {
         return null;
     }
     return number;
+};
+
+const fetchVesselOwnerIds = async () => {
+    const response = await fetch(`${USER_SERVICE_URL}/users`, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to fetch users (HTTP ${response.status})`);
+    }
+
+    const users = await response.json();
+    if (!Array.isArray(users)) {
+        return [];
+    }
+
+    return users
+        .filter((user) => user && user.type === 'vessel_owner')
+        .map((user) => parsePositiveInt(user.id))
+        .filter(Boolean);
+};
+
+const createV2GPriceUpdateNotifications = async ({ newPricePerKwh, previousPricePerKwh }) => {
+    try {
+        const vesselOwnerIds = await fetchVesselOwnerIds();
+        const uniqueUserIds = [...new Set(vesselOwnerIds)];
+
+        if (uniqueUserIds.length === 0) {
+            console.log('No vessel owners found for V2G price update notifications.');
+            return;
+        }
+
+        const title = 'V2G price updated';
+        const message = previousPricePerKwh == null
+            ? `A new V2G price has been set to $${newPricePerKwh.toFixed(2)} per kWh.`
+            : `V2G price changed from $${previousPricePerKwh.toFixed(2)} to $${newPricePerKwh.toFixed(2)} per kWh.`;
+
+        await pool.query(
+            `
+                INSERT INTO user_notifications (user_id, type, title, message, metadata)
+                SELECT
+                    user_id,
+                    'v2g_price_updated',
+                    $1,
+                    $2,
+                    $3::jsonb
+                FROM UNNEST($4::int[]) AS user_id
+            `,
+            [
+                title,
+                message,
+                JSON.stringify({
+                    new_price_per_kwh: newPricePerKwh,
+                    previous_price_per_kwh: previousPricePerKwh,
+                }),
+                uniqueUserIds,
+            ]
+        );
+
+        console.log('Created V2G price update notifications:', {
+            recipients: uniqueUserIds.length,
+            newPricePerKwh,
+            previousPricePerKwh,
+        });
+    } catch (error) {
+        console.error('Failed to create V2G price update notifications:', error);
+    }
 };
 
 const sendBookingConfirmationNotification = async ({ userId, booking }) => {
@@ -279,6 +363,18 @@ app.put('/v2g/price', async (req, res) => {
     }
 
     try {
+        const existingPriceResult = await pool.query(
+            'SELECT price_per_kwh FROM v2g_settings ORDER BY updated_at DESC LIMIT 1'
+        );
+
+        let previousPricePerKwh = null;
+        if (existingPriceResult.rows.length > 0) {
+            const existing = Number(existingPriceResult.rows[0].price_per_kwh);
+            if (Number.isFinite(existing) && existing > 0) {
+                previousPricePerKwh = existing;
+            }
+        }
+
         const result = await pool.query(
             `
                 INSERT INTO v2g_settings (price_per_kwh)
@@ -288,9 +384,104 @@ app.put('/v2g/price', async (req, res) => {
             [parsed]
         );
 
+        if (previousPricePerKwh == null || Math.abs(previousPricePerKwh - parsed) > Number.EPSILON) {
+            setImmediate(() => {
+                void createV2GPriceUpdateNotifications({
+                    newPricePerKwh: parsed,
+                    previousPricePerKwh,
+                });
+            });
+        }
+
         return res.status(200).json(result.rows[0]);
     } catch (error) {
         console.error('Error updating V2G price:', error);
+        return res.status(500).json({ message: 'Server error' });
+    }
+});
+
+app.get('/notifications/user/:user_id', async (req, res) => {
+    const parsedUserId = parsePositiveInt(req.params.user_id);
+    const unreadOnly = String(req.query.unreadOnly || 'true').toLowerCase() !== 'false';
+    const parsedLimit = parsePositiveInt(req.query.limit || 10) || 10;
+    const limit = Math.min(parsedLimit, 50);
+
+    if (!parsedUserId) {
+        return res.status(400).json({ message: 'Invalid user id.' });
+    }
+
+    try {
+        const result = await pool.query(
+            `
+                SELECT id, user_id, type, title, message, metadata, is_read, created_at
+                FROM user_notifications
+                WHERE user_id = $1
+                  AND ($2 = FALSE OR is_read = FALSE)
+                ORDER BY created_at DESC
+                LIMIT $3
+            `,
+            [parsedUserId, unreadOnly, limit]
+        );
+
+        return res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching user notifications:', error);
+        return res.status(500).json({ message: 'Server error' });
+    }
+});
+
+app.put('/notifications/user/:user_id/read-all', async (req, res) => {
+    const parsedUserId = parsePositiveInt(req.params.user_id);
+    if (!parsedUserId) {
+        return res.status(400).json({ message: 'Invalid user id.' });
+    }
+
+    try {
+        const result = await pool.query(
+            `
+                UPDATE user_notifications
+                SET is_read = TRUE
+                WHERE user_id = $1
+                  AND is_read = FALSE
+            `,
+            [parsedUserId]
+        );
+
+        return res.json({ message: 'Notifications marked as read.', updated: result.rowCount || 0 });
+    } catch (error) {
+        console.error('Error marking notifications as read:', error);
+        return res.status(500).json({ message: 'Server error' });
+    }
+});
+
+app.put('/notifications/user/:user_id/:notification_id/read', async (req, res) => {
+    const parsedUserId = parsePositiveInt(req.params.user_id);
+    const parsedNotificationId = parsePositiveInt(req.params.notification_id);
+
+    if (!parsedUserId || !parsedNotificationId) {
+        return res.status(400).json({ message: 'Invalid user id or notification id.' });
+    }
+
+    try {
+        const result = await pool.query(
+            `
+                UPDATE user_notifications
+                SET is_read = TRUE
+                WHERE id = $1
+                  AND user_id = $2
+                  AND is_read = FALSE
+                RETURNING id
+            `,
+            [parsedNotificationId, parsedUserId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Notification not found or already read.' });
+        }
+
+        return res.json({ message: 'Notification marked as read.', id: result.rows[0].id });
+    } catch (error) {
+        console.error('Error marking notification as read:', error);
         return res.status(500).json({ message: 'Server error' });
     }
 });

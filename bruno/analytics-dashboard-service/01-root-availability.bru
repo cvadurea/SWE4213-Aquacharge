@@ -1,0 +1,17 @@
+meta {
+  name: Root Availability
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{analytics_base}}/
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 404", function() {
+    expect(res.getStatus()).to.equal(404);
+  });
+}

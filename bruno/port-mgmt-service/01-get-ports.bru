@@ -1,0 +1,17 @@
+meta {
+  name: Get Ports
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{port_base}}/ports
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

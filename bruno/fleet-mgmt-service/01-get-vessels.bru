@@ -1,0 +1,17 @@
+meta {
+  name: Get Vessels
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{fleet_base}}/vessels
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

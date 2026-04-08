@@ -1,0 +1,36 @@
+meta {
+  name: Booking Confirmation Notification
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{notification_base}}/notifications/booking-confirmation
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "user_id": 1,
+    "booking": {
+      "id": 999,
+      "charger_id": 1,
+      "start_time": "2026-04-07T10:00:00.000Z",
+      "end_time": "2026-04-07T11:00:00.000Z",
+      "type": "bidirectional",
+      "v2g_energy_discharged": 10,
+      "v2g_price_per_kwh": 0.25
+    }
+  }
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

@@ -1,4 +1,4 @@
-import { Building2, CalendarDays, Gauge, MapPin, Ship, UserCircle } from 'lucide-react';
+import { Building2, CalendarDays, Gauge, MapPin, Ship } from 'lucide-react';
 import { JSX } from 'react/jsx-runtime';
 
 export type NavigationItem = {
@@ -12,12 +12,10 @@ export const getVONavigation = (): NavigationItem[] => [
   { label: 'Find Chargers', id: 'find-chargers', icon: <MapPin className="h-4 w-4" /> },
   { label: 'My Bookings', id: 'my-bookings', icon: <CalendarDays className="h-4 w-4" /> },
   { label: 'My Vessels', id: 'my-vessels', icon: <Ship className="h-4 w-4" /> },
-  { label: 'Profile', id: 'profile', icon: <UserCircle className="h-4 w-4" /> },
 ];
 
 export const getPONavigation = (): NavigationItem[] => [
   { label: 'Dashboard', id: 'dashboard', icon: <Gauge className="h-4 w-4" /> },
   { label: 'Bookings', id: 'bookings', icon: <CalendarDays className="h-4 w-4" /> },
   { label: 'My Port', id: 'my-port', icon: <Building2 className="h-4 w-4" /> },
-  { label: 'Profile', id: 'profile', icon: <UserCircle className="h-4 w-4" /> },
 ];

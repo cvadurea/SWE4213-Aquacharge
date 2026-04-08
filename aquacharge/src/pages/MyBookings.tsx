@@ -27,8 +27,8 @@ interface MyBookingsProps {
   onLogout: () => void;
 }
 
-type FilterType = 'all' | 'confirmed' | 'pending' | 'active' | 'pending_verification' | 'completed' | 'failed' | 'cancelled';
-type BookingStatus = 'confirmed' | 'pending' | 'active' | 'pending_verification' | 'completed' | 'failed' | 'cancelled';
+type FilterType = 'all' | 'confirmed' | 'active' | 'pending_verification' | 'completed' | 'failed' | 'cancelled';
+type BookingStatus = 'confirmed' | 'active' | 'pending_verification' | 'completed' | 'failed' | 'cancelled';
 
 export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -41,10 +41,14 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
   const [endingBookingId, setEndingBookingId] = useState<string | null>(null);
 
   const normalizeStatus = (status: string): BookingStatus => {
-    if (status === 'confirmed' || status === 'pending' || status === 'active' || status === 'pending_verification' || status === 'completed' || status === 'failed' || status === 'cancelled') {
+    if (status === 'pending') {
+      return 'pending_verification';
+    }
+
+    if (status === 'confirmed' || status === 'active' || status === 'pending_verification' || status === 'completed' || status === 'failed' || status === 'cancelled') {
       return status;
     }
-    return 'pending';
+    return 'pending_verification';
   };
 
   const formatStatusLabel = (status: string) => {
@@ -302,6 +306,9 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
     if (filterStatus === 'all') {
       return bookings;
     }
+    if (filterStatus === 'pending_verification') {
+      return bookings.filter((b) => b.status === 'pending_verification' || b.status === 'pending');
+    }
     return bookings.filter((b) => b.status === filterStatus);
   }, [bookings, filterStatus]);
 
@@ -315,9 +322,8 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
     return {
       total: bookings.length,
       confirmed: bookings.filter((b) => b.status === 'confirmed').length,
-      pending: bookings.filter((b) => b.status === 'pending').length,
       active: bookings.filter((b) => b.status === 'active').length,
-      pendingVerification: bookings.filter((b) => b.status === 'pending_verification').length,
+      pendingVerification: bookings.filter((b) => b.status === 'pending_verification' || b.status === 'pending').length,
       completed: bookings.filter((b) => b.status === 'completed').length,
       failed: bookings.filter((b) => b.status === 'failed').length,
       cancelled: bookings.filter((b) => b.status === 'cancelled').length,
@@ -373,12 +379,6 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground uppercase tracking-wide">Pending</p>
-            <p className="mt-2 text-2xl font-bold text-yellow-500">{stats.pending}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground uppercase tracking-wide">Active</p>
             <p className="mt-2 text-2xl font-bold text-blue-600">{stats.active}</p>
           </CardContent>
@@ -392,7 +392,7 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground uppercase tracking-wide">Completed</p>
-            <p className="mt-2 text-2xl font-bold text-slate-500">{stats.completed}</p>
+            <p className="mt-2 text-2xl font-bold text-green-600">{stats.completed}</p>
           </CardContent>
         </Card>
         <Card>
@@ -420,13 +420,6 @@ export default function MyBookings({ onNavigate, onLogout }: MyBookingsProps) {
           onClick={() => setFilterStatus('confirmed')}
         >
           Confirmed ({stats.confirmed})
-        </Button>
-        <Button
-          variant={filterStatus === 'pending' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setFilterStatus('pending')}
-        >
-          Pending ({stats.pending})
         </Button>
         <Button
           variant={filterStatus === 'active' ? 'default' : 'outline'}

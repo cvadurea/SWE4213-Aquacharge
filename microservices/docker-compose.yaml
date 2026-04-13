@@ -4,33 +4,12 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - analytics-service
       - auth-service
       - booking-service
       - fleet-service
       - notification-service
       - port-service
       - user-service
-    networks:
-      - app-network
-
-  analytics-service:
-    build: ./analytics-dashboard-service
-    ports:
-      - "3001:3001"
-    environment:
-      DB_HOST: analytics-db
-      DB_PORT: 5432
-      DB_NAME: analyticsdb
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
-    #   interval: 10s
-    #   timeout: 5s
-    #   retries: 5
-    # depends_on:
-    #   - analytics-db
     networks:
       - app-network
 
